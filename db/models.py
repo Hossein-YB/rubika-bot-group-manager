@@ -32,6 +32,25 @@ class Admin(BaseModel):
 class Group(BaseModel):
     guid = CharField(max_length=250, unique=True)
 
+    @classmethod
+    def insert_group(cls, guid):
+        group = cls.get_or_none(cls.guid == guid)
+        if not group and guid:
+            cls.create(guid=guid)
+            return True
+        else:
+            return False
+
+    @classmethod
+    def get_groups_list(cls):
+        groups = cls.select()
+        groups_ids = []
+        if groups:
+            for group in groups:
+                groups_ids.append(group.guid)
+            return groups_ids
+        else:
+            return groups_ids
 
 class GroupAdmin(BaseModel):
     guid = CharField(max_length=250, unique=True)
