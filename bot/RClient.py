@@ -17,7 +17,7 @@ class RubikaBot(Client):
             help = f.read()
         await msg.reply(help)
 
-    async def set_sudo_admin(self, msg: Message):
+    async def set_sudo_admin_bot(self, msg: Message):
         guid = msg.author_guid
         if self.sudo:
             ad = await self.get_user_info(self.sudo)
@@ -28,11 +28,23 @@ class RubikaBot(Client):
             await msg.reply("مدیر تنظیم شد.")
         else:
             await msg.reply("مشکلی رخ داد.")
-        
+
+    async def add_group_bot(self, msg: Message):
+        guid_group = msg.object_guid
+        if guid_group in self.groups_id:
+            return await msg.reply(f"گروه از قبل برای ربات تنظیم شده است.")
+
+        if Group.insert_group(guid_group):
+            self.groups_id.append(guid_group)
+            await msg.reply("گروه تنظیم شد.")
+        else:
+            await msg.reply("مشکلی رخ داد.")
+
 
     async def run_until_disconnected(self):
         await self.start()
         self.add_handler(self.help_bot, handlers.MessageUpdates(models.RegexModel('^!help$')))
-        self.add_handler(self.set_sudo_admin, handlers.MessageUpdates((models.RegexModel('^!setsudo$') & models.is_private())))
+        self.add_handler(self.set_sudo_admin_bot, handlers.MessageUpdates((models.RegexModel('^!setsudo$') & models.is_private())))
+        self.add_handler(self.add_group_bot, handlers.MessageUpdates((models.RegexModel('^!setgroup$') & models.is_group())))
         return await super().run_until_disconnected()
 
