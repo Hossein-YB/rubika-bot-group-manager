@@ -1,6 +1,9 @@
 # my ignore
 .idea
 session.*
+*.sqlite3
+*.db
+*.rbs
 
 
 ### Python ###
