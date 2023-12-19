@@ -1,5 +1,3 @@
-from pdb import set_trace
-
 from peewee import SqliteDatabase, Model, CharField, ForeignKeyField, BooleanField
 
 database = SqliteDatabase("bot_db.sqlite3")
@@ -73,7 +71,6 @@ class GroupAdmin(BaseModel):
         admins = cls.select()
         groups_admin = dict()
         if admins:
-            set_trace()
             for admin in admins:
                 if not groups_admin.get(admin.group_id.guid, None):
                     groups_admin[admin.group_id.guid] = {'admins': [], "creator": ""}
@@ -85,3 +82,57 @@ class GroupAdmin(BaseModel):
             return groups_admin
         else:
             return groups_admin
+
+
+class GroupSettings(BaseModel):
+    names = {
+        'گیف': "gif",
+        'ویدیو': "video",
+        'مخاطب': "contact",
+        'موسیقی': "music",
+        'ویس': "voice",
+        'مکان': "location",
+        'عکس': "img",
+        'ویدیو نوت': "video_note",
+        'پست': "post",
+        'لینک': "link",
+        'منشن': "mention",
+        'استیکر': "sticker",
+        'نظرسنجی': "vote",
+        'چت': "chat",
+        'قفل گروه': "all_lock",
+    }
+    group_guid = ForeignKeyField(Group, Group.guid, on_delete="CASCADE")
+    gif = BooleanField(default=False)
+    chat = BooleanField(default=False)
+    video = BooleanField(default=False)
+    contact = BooleanField(default=False)
+    music = BooleanField(default=False)
+    voice = BooleanField(default=False)
+    location = BooleanField(default=False)
+    img = BooleanField(default=False)
+    video_note = BooleanField(default=False)
+    post = BooleanField(default=False)
+    link = BooleanField(default=True)
+    mention = BooleanField(default=True)
+    sticker = BooleanField(default=False)
+    vote = BooleanField(default=False)
+    all_lock = BooleanField(default=False)
+
+    @classmethod
+    def insert_group(cls, g_guid):
+        setting = cls.get_or_none(cls.group_guid == g_guid)
+        if not setting:
+            setting = cls.create(group_guid=g_guid)
+        else:
+            return setting
+
+    @classmethod
+    def update_setting(cls, g_guid, setting_name, status):
+        group = cls.get_or_none(cls.group_guid == g_guid)
+        if group:
+            group.setting_name = status
+            group.save()
+        else:
+            return None
+
