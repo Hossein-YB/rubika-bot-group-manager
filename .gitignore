@@ -1,5 +1,6 @@
 # my ignore
 .idea
+.idea/
 session.*
 *.sqlite3
 *.db
