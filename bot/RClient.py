@@ -110,9 +110,9 @@ class RubikaBot(Client):
         guid = msg.object_guid
         sender = msg.author_guid
 
-        # admins = await self.normalize_admins(guid)
-        # if not admins or len(admins) == 0 or sender in admins:
-        #     return False
+        admins = await self.normalize_admins(guid)
+        if not admins or len(admins) == 0 or sender in admins:
+            return False
 
         group_setting = GroupSettings.get_or_none(GroupSettings.group_guid == guid)
         if not group_setting:
