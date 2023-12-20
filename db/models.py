@@ -1,3 +1,5 @@
+from pdb import set_trace
+
 from peewee import SqliteDatabase, Model, CharField, ForeignKeyField, BooleanField
 
 database = SqliteDatabase("bot_db.sqlite3")
@@ -92,7 +94,7 @@ class GroupSettings(BaseModel):
         'موسیقی': "music",
         'ویس': "voice",
         'مکان': "location",
-        'عکس': "img",
+        'عکس': "image",
         'ویدیو نوت': "video_note",
         'پست': "post",
         'لینک': "link",
@@ -110,7 +112,7 @@ class GroupSettings(BaseModel):
     music = BooleanField(default=False)
     voice = BooleanField(default=False)
     location = BooleanField(default=False)
-    img = BooleanField(default=False)
+    image = BooleanField(default=False)
     video_note = BooleanField(default=False)
     post = BooleanField(default=False)
     link = BooleanField(default=True)
@@ -131,7 +133,7 @@ class GroupSettings(BaseModel):
     def update_setting(cls, g_guid, setting_name, status):
         group = cls.get_or_none(cls.group_guid == g_guid)
         if group:
-            group.setting_name = status
+            setattr(group, setting_name, status)
             group.save()
         else:
             return None
