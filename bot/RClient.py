@@ -199,6 +199,25 @@ class RubikaBot(Client):
             if links or mention:
                 await msg.delete_messages()
 
+    async def set_new_admin(self, msg: Message):
+        guid = msg.object_guid
+        sender = msg.author_guid
+        creator = None
+
+        if self.groups_admins_list.get(guid, None):
+            creator = self.groups_admins_list.get(guid, None)
+
+        if sender != self.sudo or sender != creator['creator']:
+            return False
+
+        user = await self.get_messages_by_ID(guid, msg.message.reply_to_message_id)
+        user = user.messages[0].author_object_guid
+        user = await self.get_user_info(user)
+        GroupAdmin.insert_group_admin(user.user.user_guid, guid)
+        creator["admins"].append(user.user.user_guid)
+        return await msg.reply(f"کاربر به لیست ادمین های ربات در گروه اضافه شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
+
+
     async def run_until_disconnected(self):
         await self.start()
 
