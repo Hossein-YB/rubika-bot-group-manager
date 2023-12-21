@@ -95,13 +95,13 @@ class GroupSettings(BaseModel):
         'ویس': "voice",
         'مکان': "location",
         'عکس': "image",
-        'ویدیو نوت': "video_note",
         'پست': "post",
         'لینک': "link",
         'منشن': "mention",
         'استیکر': "sticker",
-        'نظرسنجی': "vote",
+        'نظرسنجی': "poll",
         'چت': "chat",
+        'فروارد': "forwarded_from",
         'قفل گروه': "all_lock",
     }
     group_guid = ForeignKeyField(Group, Group.guid, on_delete="CASCADE")
@@ -113,12 +113,12 @@ class GroupSettings(BaseModel):
     voice = BooleanField(default=False)
     location = BooleanField(default=False)
     image = BooleanField(default=False)
-    video_note = BooleanField(default=False)
     post = BooleanField(default=False)
     link = BooleanField(default=True)
     mention = BooleanField(default=True)
     sticker = BooleanField(default=False)
-    vote = BooleanField(default=False)
+    poll = BooleanField(default=False)
+    forwarded_from = BooleanField(default=False)
     all_lock = BooleanField(default=False)
 
     @classmethod
@@ -137,4 +137,36 @@ class GroupSettings(BaseModel):
             group.save()
         else:
             return None
+
+    @classmethod
+    def update_all(cls, guid, status=0):
+        list_attr = cls.names.values()
+        group_setting = cls.get_or_none(cls.group_guid == guid)
+        if not group_setting:
+            return False
+        for attr in list_attr:
+            setattr(group_setting, attr, status)
+        group_setting.save()
+
+    @classmethod
+    def get_group_status(cls, guid):
+        group_setting = cls.get_or_none(cls.group_guid == guid)
+        if not group_setting:
+            return False
+        text = ""
+        for key, val in cls.names.items():
+            if getattr(group_setting, val):
+                status = "قفل است"
+            else:
+                status = "باز است"
+
+            text += f"وضعیت قفل {key} {status} \n"
+
+        return text
+
+
+
+
+
+
 
