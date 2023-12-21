@@ -68,6 +68,15 @@ class GroupAdmin(BaseModel):
             return False
 
     @classmethod
+    def delete_group_admin(cls, a_guid, g_guid):
+        group = cls.get_or_none(cls.guid == a_guid, cls.group_id == g_guid)
+        if group:
+            group.delete_instance()
+            return True
+        else:
+            return False
+
+    @classmethod
     def get_groups_admins_list(cls):
         admins = cls.select()
         groups_admin = dict()
@@ -162,10 +171,3 @@ class GroupSettings(BaseModel):
             text += f"وضعیت قفل {key} {status} است\n"
 
         return text
-
-
-
-
-
-
-

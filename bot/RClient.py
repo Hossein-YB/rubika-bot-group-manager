@@ -217,6 +217,23 @@ class RubikaBot(Client):
         creator["admins"].append(user.user.user_guid)
         return await msg.reply(f"کاربر به لیست ادمین های ربات در گروه اضافه شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
 
+    async def delete_admin(self, msg: Message):
+        guid = msg.object_guid
+        sender = msg.author_guid
+        creator = None
+
+        if self.groups_admins_list.get(guid, None):
+            creator = self.groups_admins_list.get(guid, None)
+
+        if sender != self.sudo or sender != creator['creator']:
+            return False
+
+        user = await self.get_messages_by_ID(guid, msg.message.reply_to_message_id)
+        user = user.messages[0].author_object_guid
+        user = await self.get_user_info(user)
+        GroupAdmin.delete_group_admin(user.user.user_guid, guid)
+        creator["admins"].remove(user.user.user_guid)
+        return await msg.reply(f"کاربر از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
 
     async def run_until_disconnected(self):
         await self.start()
@@ -232,6 +249,8 @@ class RubikaBot(Client):
             (self.unlock_all, models.RegexModel(pattern='^!بازکردن همه'), models.is_group, models.object_guid in self.groups_id),
             (self.group_status, models.RegexModel(pattern='^!وضعیت'), models.is_group, models.object_guid in self.groups_id),
             (self.ban_user, models.RegexModel(pattern='^!بن'), models.is_group, models.object_guid in self.groups_id),
+            (self.set_new_admin, models.RegexModel(pattern='^!ارتقا مقام'), models.is_group, models.object_guid in self.groups_id),
+            (self.set_new_admin, models.RegexModel(pattern='^!تنزل مقام'), models.is_group, models.object_guid in self.groups_id),
             (self.manage_group_setting, models.is_group, models.object_guid in self.groups_id),
         ]
 
