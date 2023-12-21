@@ -3,8 +3,11 @@
 .idea/
 session.*
 *.sqlite3git
+bot_db.sqlite3
+*.sqlite3
 *.db
 *.rbs
+.env
 
 
 ### Python ###
