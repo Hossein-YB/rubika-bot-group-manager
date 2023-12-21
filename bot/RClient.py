@@ -24,6 +24,13 @@ class RubikaBot(Client):
         return admins
 
     async def help_bot(self, msg: Message):
+
+        sender = msg.author_guid
+        if msg.is_group and sender != self.sudo:
+            guid = msg.object_guid
+            admins = await self.normalize_admins(guid)
+            if not admins or sender not in admins:
+                return False
         with open("./bot/help.txt", "r", encoding='utf-8') as f:
             help = f.read()
         await msg.reply(help)
@@ -41,6 +48,9 @@ class RubikaBot(Client):
             await msg.reply("مشکلی رخ داد.")
 
     async def add_group_bot(self, msg: Message):
+        sender = msg.author_guid
+        if sender != self.sudo:
+            return False
         guid_group = msg.object_guid
         if guid_group in self.groups_id and guid_group in self.groups_admins_list:
             return await msg.reply(f"گروه از قبل برای ربات تنظیم شده است.")
@@ -56,6 +66,14 @@ class RubikaBot(Client):
 
     async def update_group_admin(self, msg: Message):
         guid_group = msg.object_guid
+        sender = msg.author_guid
+        creator = None
+
+        if self.groups_admins_list.get(guid_group, None):
+            creator = self.groups_admins_list.get(guid_group, None)['creator']
+
+        if sender != self.sudo or sender != creator:
+            return False
 
         admins = await self.get_group_admin_members(guid_group)
         new_group_admin = {'admins': [], 'creator': None}
@@ -71,6 +89,11 @@ class RubikaBot(Client):
         await msg.reply("به روز رسانی با موفقیت انجام شد.")
 
     async def get_lock_list(self, msg: Message):
+        guid = msg.object_guid
+        sender = msg.author_guid
+        admins = await self.normalize_admins(guid)
+        if not admins or sender not in admins or sender != self.sudo:
+            return False
         text = "لیست قفل های ربات:"
         for i in GroupSettings.names.keys():
             text += f"\n`!قفل {i}`\t !بازکردن {i}"
@@ -80,7 +103,7 @@ class RubikaBot(Client):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
-        if not admins or len(admins) == 0 or sender not in admins:
+        if not admins or sender not in admins or sender != self.sudo:
             return False
         GroupSettings.update_all(guid, 0)
         return await msg.reply("همه قفل ها باز شدند")
@@ -89,7 +112,7 @@ class RubikaBot(Client):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
-        if not admins or len(admins) == 0 or sender not in admins:
+        if not admins or sender not in admins or sender != self.sudo:
             return False
         status = "وضعیت قفل های گروه به این ترتیب است:\n" + GroupSettings.get_group_status(guid)
         return await msg.reply(status)
@@ -98,7 +121,7 @@ class RubikaBot(Client):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
-        if not admins or len(admins) == 0 or sender not in admins:
+        if not admins or sender not in admins or sender != self.sudo:
             return False
 
         lock_name = msg.message.text.replace("!قفل", "").strip()
@@ -111,7 +134,7 @@ class RubikaBot(Client):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
-        if not admins or len(admins) == 0 or sender not in admins:
+        if not admins or sender not in admins or sender != self.sudo:
             return False
         unlock_name = msg.message.text.replace("!بازکردن", "").strip()
         en_lock_name = GroupSettings.names.get(unlock_name, False)
@@ -123,7 +146,7 @@ class RubikaBot(Client):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
-        if not admins or len(admins) == 0 or sender not in admins:
+        if not admins or sender not in admins or sender != self.sudo:
             return False
 
         user = await self.get_messages_by_ID(guid, msg.message.reply_to_message_id)
@@ -141,7 +164,7 @@ class RubikaBot(Client):
         sender = msg.author_guid
 
         admins = await self.normalize_admins(guid)
-        if not admins or len(admins) == 0 or sender in admins or sender == self.sudo:
+        if not admins or sender in admins or sender == self.sudo:
             return False
 
         group_setting = GroupSettings.get_or_none(GroupSettings.group_guid == guid)
