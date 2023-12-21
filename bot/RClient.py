@@ -1,8 +1,7 @@
-from pdb import set_trace
-
 from rubpy import Client, handlers, Message
 from rubpy.structs import models
 
+from bot.tools import LINK_RE, MENTION
 from db.models import Admin, Group, GroupAdmin, GroupSettings
 import re
 
@@ -74,8 +73,26 @@ class RubikaBot(Client):
     async def get_lock_list(self, msg: Message):
         text = "لیست قفل های ربات:"
         for i in GroupSettings.names.keys():
-            text += f"\n`!قفل {i}`"
+            text += f"\n`!قفل {i}`\t !بازکردن {i}"
         await msg.reply(text)
+
+    async def unlock_all(self, msg: Message):
+        guid = msg.object_guid
+        sender = msg.author_guid
+        admins = await self.normalize_admins(guid)
+        if not admins or len(admins) == 0 or sender not in admins:
+            return False
+        GroupSettings.update_all(guid, 0)
+        return await msg.reply("همه قفل ها باز شدند")
+
+    async def group_status(self, msg: Message):
+        guid = msg.object_guid
+        sender = msg.author_guid
+        admins = await self.normalize_admins(guid)
+        if not admins or len(admins) == 0 or sender not in admins:
+            return False
+        status = "وضعیت قفل های گروه به این ترتیب است:\n" + GroupSettings.get_group_status(guid)
+        return await msg.reply(status)
 
     async def lock_group_setting(self, msg: Message):
         guid = msg.object_guid
@@ -105,7 +122,6 @@ class RubikaBot(Client):
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
         m_type = msg.message.type.lower()
-        print(text, m_type)
 
         guid = msg.object_guid
         sender = msg.author_guid
@@ -118,21 +134,32 @@ class RubikaBot(Client):
         if not group_setting:
             return False
 
-        if group_setting.post and m_type == "rubinopost":
+        if ((group_setting.chat and text and not msg.file_inline)
+                or group_setting.all_lock):
             return await msg.delete_messages()
 
-        if msg.file_inline:
-            f_type = msg.file_inline.type.lower()
+        if (
+                (group_setting.post and m_type == "rubinopost") or
+                (group_setting.forwarded_from and msg.forwarded_from or msg.forwarded_no_link) or
+                group_setting.all_lock
+        ):
+            return await msg.delete_messages()
+
+        if msg.file_inline or msg.location or msg.sticker or msg.poll:
+            if msg.file_inline:
+                f_type = msg.file_inline.type.lower()
+            else:
+                f_type = msg.message.type.lower()
+
             setting = getattr(group_setting, f_type)
+            print(f_type, setting)
             if setting:
-                await msg.delete_messages()
+                return await msg.delete_messages()
 
         if text and (group_setting.link or group_setting.mention):
-            link_re = re.compile(
-                "((http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?|([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?)"
-            )
-            finds = re.findall(link_re, text)
-            if finds:
+            links = re.findall(LINK_RE, text)
+            mention = re.findall(MENTION, text)
+            if links or mention:
                 await msg.delete_messages()
 
     async def run_until_disconnected(self):
@@ -172,8 +199,21 @@ class RubikaBot(Client):
         )
 
         self.add_handler(
+            self.unlock_all,
+            handlers.MessageUpdates(models.RegexModel(pattern='^!بازکردن همه'),
+                                    models.is_group, models.object_guid in self.groups_id)
+        )
+
+        self.add_handler(
+            self.group_status,
+            handlers.MessageUpdates(models.RegexModel(pattern='^!وضعیت'),
+                                    models.is_group, models.object_guid in self.groups_id)
+        )
+        self.add_handler(
             self.manage_group_setting,
             handlers.MessageUpdates(models.is_group, models.object_guid in self.groups_id)
         )
+
+
 
         return await super().run_until_disconnected()

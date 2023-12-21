@@ -1,8 +1,7 @@
-from pdb import set_trace
-
 from peewee import SqliteDatabase, Model, CharField, ForeignKeyField, BooleanField
 
 database = SqliteDatabase("bot_db.sqlite3")
+
 
 class BaseModel(Model):
     class Meta:
