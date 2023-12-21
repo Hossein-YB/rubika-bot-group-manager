@@ -1,3 +1,5 @@
+from pdb import set_trace
+
 from rubpy import Client, handlers, Message
 from rubpy.structs import models
 
@@ -11,6 +13,7 @@ class RubikaBot(Client):
         self.sudo = Admin.get_sudo()
         self.groups_id = Group.get_groups_list()
         self.groups_admins_list = GroupAdmin.get_groups_admins_list()
+        self.group_delete_messages = []
         print(
             f"{'#---#' * 20}\nsudo -> {self.sudo}\ngroup -> {self.groups_id}\ngroups admins -> {self.groups_admins_list}\n{'#---#' * 20}")
         super().__init__(session, *args, **kwargs)
@@ -72,7 +75,7 @@ class RubikaBot(Client):
         if self.groups_admins_list.get(guid_group, None):
             creator = self.groups_admins_list.get(guid_group, None)['creator']
 
-        if sender != self.sudo or sender != creator:
+        if sender != self.sudo or not sender != creator:
             return False
 
         admins = await self.get_group_admin_members(guid_group)
@@ -156,6 +159,28 @@ class RubikaBot(Client):
         await self.ban_group_member(guid, user.user.user_guid)
         return await msg.reply(f"کاربر {user.user.first_name} با از گروه اخراج شد.")
 
+    async def delete_all_messages(self, msg: Message):
+        guid = msg.object_guid
+        sender = msg.author_guid
+        admins = await self.normalize_admins(guid)
+        if not admins or sender not in admins or sender != self.sudo:
+            return False
+        if guid not in self.group_delete_messages:
+            self.group_delete_messages.append(guid)
+        else:
+            return False
+        await msg.reply("شروع پاکسازی ...")
+        while True:
+            messages = await self.get_messages_interval(guid, msg.message_id)
+            if not messages.messages:
+                break
+            ids = []
+            for message in messages.messages:
+                ids.append(message.message_id)
+            await self.delete_messages(guid, ids)
+
+        return await self.send_message(guid, "تمام پیام ها پاک شدند")
+
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
         m_type = msg.message.type.lower()
@@ -198,6 +223,9 @@ class RubikaBot(Client):
             mention = re.findall(MENTION, text)
             if links or mention:
                 await msg.delete_messages()
+            if links:
+                await self.ban_group_member(guid, sender)
+
 
     async def set_new_admin(self, msg: Message):
         guid = msg.object_guid
@@ -247,6 +275,7 @@ class RubikaBot(Client):
             (self.get_lock_list, models.RegexModel(pattern='^!لیست قفل ها$'), models.object_guid in self.groups_id),
             (self.unlock_group_setting, models.RegexModel(pattern='^!بازکردن '), models.object_guid in self.groups_id),
             (self.unlock_all, models.RegexModel(pattern='^!بازکردن همه'), models.is_group, models.object_guid in self.groups_id),
+            (self.delete_all_messages, models.RegexModel(pattern='^!پاک کردن پیام ها'), models.is_group, models.object_guid in self.groups_id),
             (self.group_status, models.RegexModel(pattern='^!وضعیت'), models.is_group, models.object_guid in self.groups_id),
             (self.ban_user, models.RegexModel(pattern='^!بن'), models.is_group, models.object_guid in self.groups_id),
             (self.set_new_admin, models.RegexModel(pattern='^!ارتقا مقام'), models.is_group, models.object_guid in self.groups_id),
