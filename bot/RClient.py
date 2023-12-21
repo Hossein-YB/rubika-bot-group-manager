@@ -119,6 +119,20 @@ class RubikaBot(Client):
             GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=False)
             await msg.reply(f"قفل {unlock_name} غیر فعال شد.")
 
+    async def ban_user(self, msg: Message):
+        guid = msg.object_guid
+        sender = msg.author_guid
+        admins = await self.normalize_admins(guid)
+        if not admins or len(admins) == 0 or sender not in admins:
+            return False
+
+        user = await self.get_messages_by_ID(guid, msg.message.reply_to_message_id)
+        user = user.messages[0].author_object_guid
+        user = await self.get_user_info(user)
+
+        await self.ban_group_member(guid, user.user.user_guid)
+        return await msg.reply(f"کاربر {user.user.first_name} با از گروه اخراج شد.")
+
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
         m_type = msg.message.type.lower()
@@ -127,7 +141,7 @@ class RubikaBot(Client):
         sender = msg.author_guid
 
         admins = await self.normalize_admins(guid)
-        if not admins or len(admins) == 0 or sender in admins:
+        if not admins or len(admins) == 0 or sender in admins or sender == self.sudo:
             return False
 
         group_setting = GroupSettings.get_or_none(GroupSettings.group_guid == guid)
@@ -165,55 +179,21 @@ class RubikaBot(Client):
     async def run_until_disconnected(self):
         await self.start()
 
-        self.add_handler(
-            self.help_bot,
-            handlers.MessageUpdates(models.RegexModel('^!help$'))
-        )
+        handlers_list = [
+            (self.help_bot, models.RegexModel('^!راهنما$')),
+            (self.set_sudo_admin_bot, models.RegexModel(pattern='^!setsudo$'), models.is_private),
+            (self.add_group_bot, models.RegexModel(pattern='^!setgroup$'), models.is_group),
+            (self.update_group_admin, models.RegexModel(pattern='^!به روزرسانی مدیران$'), models.is_group),
+            (self.lock_group_setting, models.RegexModel(pattern='^!قفل '), models.object_guid in self.groups_id),
+            (self.get_lock_list, models.RegexModel(pattern='^!لیست قفل ها$'), models.object_guid in self.groups_id),
+            (self.unlock_group_setting, models.RegexModel(pattern='^!بازکردن '), models.object_guid in self.groups_id),
+            (self.unlock_all, models.RegexModel(pattern='^!بازکردن همه'), models.is_group, models.object_guid in self.groups_id),
+            (self.group_status, models.RegexModel(pattern='^!وضعیت'), models.is_group, models.object_guid in self.groups_id),
+            (self.ban_user, models.RegexModel(pattern='^!بن'), models.is_group, models.object_guid in self.groups_id),
+            (self.manage_group_setting, models.is_group, models.object_guid in self.groups_id),
+        ]
 
-        self.add_handler(
-            self.set_sudo_admin_bot,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!setsudo$'), models.is_private)
-        )
-
-        self.add_handler(
-            self.add_group_bot,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!setgroup$'), models.is_group)
-        )
-
-        self.add_handler(
-            self.update_group_admin,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!updateadmins$'), models.is_group)
-        )
-
-        self.add_handler(
-            self.lock_group_setting,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!قفل '), models.object_guid in self.groups_id)
-        )
-        self.add_handler(
-            self.get_lock_list,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!لیست قفل ها$'), models.object_guid in self.groups_id)
-        )
-        self.add_handler(
-            self.unlock_group_setting,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!بازکردن '), models.object_guid in self.groups_id)
-        )
-
-        self.add_handler(
-            self.unlock_all,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!بازکردن همه'),
-                                    models.is_group, models.object_guid in self.groups_id)
-        )
-
-        self.add_handler(
-            self.group_status,
-            handlers.MessageUpdates(models.RegexModel(pattern='^!وضعیت'),
-                                    models.is_group, models.object_guid in self.groups_id)
-        )
-        self.add_handler(
-            self.manage_group_setting,
-            handlers.MessageUpdates(models.is_group, models.object_guid in self.groups_id)
-        )
-
-
+        for handler, *conditions in handlers_list:
+            self.add_handler(handler, handlers.MessageUpdates(*conditions))
 
         return await super().run_until_disconnected()
