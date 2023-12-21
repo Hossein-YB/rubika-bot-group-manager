@@ -156,11 +156,11 @@ class GroupSettings(BaseModel):
         text = ""
         for key, val in cls.names.items():
             if getattr(group_setting, val):
-                status = "قفل است"
+                status = "فعال"
             else:
-                status = "باز است"
+                status = "باز "
 
-            text += f"وضعیت قفل {key} {status} \n"
+            text += f"وضعیت قفل {key} {status} است\n"
 
         return text
 
