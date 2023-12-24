@@ -3,17 +3,20 @@ from pdb import set_trace
 from rubpy import Client, handlers, Message
 from rubpy.structs import models
 
+from bot.telegram_bot import TeleBot
 from bot.tools import LINK_RE, MENTION
 from db.models import Admin, Group, GroupAdmin, GroupSettings
 import re
+import os
 
 
 class RubikaBot(Client):
-    def __init__(self, session: str, *args, **kwargs):
+    def __init__(self, session: str, api_id, api_hash, *args, **kwargs):
         self.sudo = Admin.get_sudo()
         self.groups_id = Group.get_groups_list()
         self.groups_admins_list = GroupAdmin.get_groups_admins_list()
         self.group_delete_messages = []
+        self.telebot = TeleBot("telegram-session", api_id=api_id, api_hash=api_hash)
         print(
             f"{'#---#' * 20}\nsudo -> {self.sudo}\ngroup -> {self.groups_id}\ngroups admins -> {self.groups_admins_list}\n{'#---#' * 20}")
         super().__init__(session, *args, **kwargs)
@@ -181,6 +184,13 @@ class RubikaBot(Client):
 
         return await self.send_message(guid, "تمام پیام ها پاک شدند")
 
+    async def search_music(self, msg: Message):
+        text = msg.message.text
+        res = await self.telebot.search_music(text)
+        res = await msg.reply(file_inline=res)
+        print(res)
+        os.remove(res)
+
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
         m_type = msg.message.type.lower()
@@ -226,7 +236,6 @@ class RubikaBot(Client):
             if links:
                 await self.ban_group_member(guid, sender)
 
-
     async def set_new_admin(self, msg: Message):
         guid = msg.object_guid
         sender = msg.author_guid
@@ -264,12 +273,16 @@ class RubikaBot(Client):
         return await msg.reply(f"کاربر از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
 
     async def run_until_disconnected(self):
+        await self.telebot.connect()
         await self.start()
+        if not await self.telebot.is_user_authorized():
+            await self.telebot.signin()
 
         handlers_list = [
             (self.help_bot, models.RegexModel('^!راهنما$')),
             (self.set_sudo_admin_bot, models.RegexModel(pattern='^!setsudo$'), models.is_private),
             (self.add_group_bot, models.RegexModel(pattern='^!setgroup$'), models.is_group),
+            (self.search_music, models.RegexModel(pattern='^!(اهنگ|آهنگ|موسیقی|موزیک)'), models.is_group),
             (self.update_group_admin, models.RegexModel(pattern='^!به روزرسانی مدیران$'), models.is_group),
             (self.lock_group_setting, models.RegexModel(pattern='^!قفل '), models.object_guid in self.groups_id),
             (self.get_lock_list, models.RegexModel(pattern='^!لیست قفل ها$'), models.object_guid in self.groups_id),
