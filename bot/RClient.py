@@ -1,5 +1,3 @@
-from pdb import set_trace
-
 from rubpy import Client, handlers, Message
 from rubpy.structs import models
 
@@ -88,7 +86,6 @@ class RubikaBot(Client):
             GroupAdmin.insert_group_admin(admin.member_guid, guid_group, is_sudo)
             new_group_admin['admins'].append(admin.member_guid)
         self.groups_admins_list[guid_group] = new_group_admin
-        print(self.groups_admins_list)
         await msg.reply("به روز رسانی با موفقیت انجام شد.")
 
     async def get_lock_list(self, msg: Message):
@@ -214,7 +211,6 @@ class RubikaBot(Client):
                 f_type = msg.message.type.lower()
 
             setting = getattr(group_setting, f_type)
-            print(f_type, setting)
             if setting:
                 return await msg.delete_messages()
 
