@@ -1,10 +1,17 @@
+import asyncio
+from pathlib import Path
 from pdb import set_trace
+from typing import Optional, Union
 
+import aiofiles
 from rubpy import Client, handlers, Message
-from rubpy.structs import models
+from rubpy.gadgets import methods, thumbnail
+from rubpy.gadgets.models import messages
+from rubpy.parser import html_to_markdown
+from rubpy.structs import models, Struct
 
 from bot.telegram_bot import TeleBot
-from bot.tools import LINK_RE, MENTION
+from bot.tools import LINK_RE, MENTION, read_music_file
 from db.models import Admin, Group, GroupAdmin, GroupSettings
 import re
 import os
@@ -20,6 +27,64 @@ class RubikaBot(Client):
         print(
             f"{'#---#' * 20}\nsudo -> {self.sudo}\ngroup -> {self.groups_id}\ngroups admins -> {self.groups_admins_list}\n{'#---#' * 20}")
         super().__init__(session, *args, **kwargs)
+
+    async def send_message(self,
+                           object_guid: str,
+                           message: Optional[str] = None,
+                           reply_to_message_id: Optional[str] = None,
+                           file_inline: Optional[Union[Path, bytes]] = None,
+                           type: str = methods.messages.File,
+                           thumb: bool = True,
+                           auto_delete: Optional[int] = None,
+                           parse_mode: Optional[str] = 'markdown',
+                           *args, **kwargs) -> messages.SendMessage:
+
+        if object_guid.lower() in ('me', 'cloud', 'self'):
+            object_guid = self._guid
+
+        if isinstance(message, str) and parse_mode == 'html':
+            message = html_to_markdown(message)
+
+        if file_inline:
+            if not isinstance(file_inline, Struct):
+                if isinstance(file_inline, str):
+                    async with aiofiles.open(file_inline, 'rb') as file:
+                        kwargs['file_name'] = kwargs.get(
+                            'file_name', os.path.basename(file_inline))
+                        file_inline = await file.read()
+
+                if type == methods.messages.Music:
+                    thumb = None
+                    kwargs['time'] = kwargs.get('time', self.get_audio_duration(file_inline, kwargs.get('file_name')))
+
+                file_inline = await self.upload(file_inline, *args, **kwargs)
+                file_inline['type'] = type
+                file_inline['time'] = kwargs.get('time', 1)
+                file_inline['width'] = kwargs.get('width', 200)
+                file_inline['height'] = kwargs.get('height', 200)
+                file_inline['music_performer'] = kwargs.get('performer', '')
+
+                if isinstance(thumb, thumbnail.Thumbnail):
+                    file_inline['time'] = thumb.seconds
+                    file_inline['width'] = thumb.width
+                    file_inline['height'] = thumb.height
+                    file_inline['thumb_inline'] = thumb.to_base64()
+
+        result = await self(
+            methods.messages.SendMessage(
+                object_guid,
+                message=message,
+                file_inline=file_inline,
+                reply_to_message_id=reply_to_message_id))
+
+        if auto_delete is not None:
+            await asyncio.create_task(self.auto_delete_message(result.object_guid,
+                                                               result.message_id,
+                                                               auto_delete))
+
+        message = messages.SendMessage(**result.to_dict())
+        await message.set_shared_data(self, message)
+        return message
 
     async def normalize_admins(self, guid):
         admins = self.groups_admins_list.get(guid, None)
@@ -185,11 +250,13 @@ class RubikaBot(Client):
         return await self.send_message(guid, "تمام پیام ها پاک شدند")
 
     async def search_music(self, msg: Message):
+        guid = msg.object_guid
         text = msg.message.text
-        res = await self.telebot.search_music(text)
-        res = await msg.reply(file_inline=res)
+        path = await self.telebot.search_music(text)
+        res = await self.send_document(guid, path, caption=text)
+
         print(res)
-        os.remove(res)
+        os.remove(path)
 
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
@@ -211,6 +278,7 @@ class RubikaBot(Client):
             return await msg.delete_messages()
 
         if (
+                (group_setting.rubinostory and m_type == "rubinostory") or
                 (group_setting.post and m_type == "rubinopost") or
                 (group_setting.forwarded_from and msg.forwarded_from or msg.forwarded_no_link) or
                 group_setting.all_lock
@@ -255,6 +323,7 @@ class RubikaBot(Client):
         return await msg.reply(f"کاربر به لیست ادمین های ربات در گروه اضافه شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
 
     async def delete_admin(self, msg: Message):
+        print(msg)
         guid = msg.object_guid
         sender = msg.author_guid
         creator = None
