@@ -173,3 +173,14 @@ class GroupSettings(BaseModel):
             text += f"وضعیت قفل {key} {status} است\n"
 
         return text
+
+
+class Music(BaseModel):
+    music_name = CharField(max_length=1240)
+    access_hash = CharField(max_length=255)
+    search = CharField(max_length=500)
+    file_id = CharField(max_length=100)
+
+    @classmethod
+    def insert_music(cls, music_name, access_hash, search, file_id):
+        cls.create(music_name=music_name, access_hash=access_hash, search=search, file_id=file_id)

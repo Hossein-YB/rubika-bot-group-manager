@@ -1,20 +1,17 @@
-
 from rubpy import Client, handlers, Message
-from rubpy.gadgets import methods, thumbnail
-from rubpy.gadgets.models import messages
-from rubpy.parser import html_to_markdown
-from rubpy.structs import models, Struct
+from rubpy.structs import models
 
 from bot.connection import CConnection
 from bot.telegram_bot import TeleBot
 from bot.tools import LINK_RE, MENTION
-from db.models import Admin, Group, GroupAdmin, GroupSettings
+from db.models import Admin, Group, GroupAdmin, GroupSettings, Music
 import re
 import os
 
 
 class RubikaBot(Client):
     def __init__(self, session: str, api_id, api_hash, *args, **kwargs):
+        self.dnd = None
         self.sudo = Admin.get_sudo()
         self.groups_id = Group.get_groups_list()
         self.groups_admins_list = GroupAdmin.get_groups_admins_list()
@@ -209,11 +206,28 @@ class RubikaBot(Client):
         return await self.send_message(guid, "تمام پیام ها پاک شدند")
 
     async def search_music(self, msg: Message):
+        if self.dnd:
+            return await self.send_message("ربات مشغول است لطفا چن لحظه دیگر دوباره تلاش کنید")
+        self.dnd = 1
         guid = msg.object_guid
         text = msg.message.text
-        path = await self.telebot.search_music(text)
-        res = await self.send_document(guid, path, caption=text)
-        os.remove(path)
+        try:
+            for i in ('اهنگ', 'آهنگ', 'موسیقی', 'موزیک'):
+                if i in text:
+                    x = "!" + i
+                    text = text.replace(x, "").split()
+
+            path = await self.telebot.search_music(text)
+            res = await self.send_music(guid, path, caption=text)
+            if res.message.file_inline:
+                text = res.message.text
+                f = res.message.file_inline
+                Music.insert_music(music_name=f.file_name, access_hash=f.access_hash_rec, search=text, file_id=f.file_id)
+            os.remove(path)
+        except Exception as e:
+            await self.send_message("me", e)
+            await msg.reply("خطایی رخ داد لطفا منتظر بمانید")
+            pass
 
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
