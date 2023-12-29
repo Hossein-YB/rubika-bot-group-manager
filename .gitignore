@@ -5,6 +5,9 @@ session.*
 *.sqlite3git
 bot_db.sqlite3
 *.sqlite3
+*.session*
+telegram-session.*
+telegram-session*
 *.db
 *.rbs
 .env

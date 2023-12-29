@@ -104,6 +104,7 @@ class GroupSettings(BaseModel):
         'مکان': "location",
         'عکس': "image",
         'پست': "post",
+        'استوری': "rubinostory",
         'لینک': "link",
         'منشن': "mention",
         'استیکر': "sticker",
@@ -127,6 +128,7 @@ class GroupSettings(BaseModel):
     sticker = BooleanField(default=False)
     poll = BooleanField(default=False)
     forwarded_from = BooleanField(default=False)
+    rubinostory = BooleanField(default=False)
     all_lock = BooleanField(default=False)
 
     @classmethod
