@@ -10,8 +10,9 @@ from rubpy.gadgets.models import messages
 from rubpy.parser import html_to_markdown
 from rubpy.structs import models, Struct
 
+from bot.connection import CConnection
 from bot.telegram_bot import TeleBot
-from bot.tools import LINK_RE, MENTION, read_music_file
+from bot.tools import LINK_RE, MENTION
 from db.models import Admin, Group, GroupAdmin, GroupSettings
 import re
 import os
@@ -28,63 +29,26 @@ class RubikaBot(Client):
             f"{'#---#' * 20}\nsudo -> {self.sudo}\ngroup -> {self.groups_id}\ngroups admins -> {self.groups_admins_list}\n{'#---#' * 20}")
         super().__init__(session, *args, **kwargs)
 
-    async def send_message(self,
-                           object_guid: str,
-                           message: Optional[str] = None,
-                           reply_to_message_id: Optional[str] = None,
-                           file_inline: Optional[Union[Path, bytes]] = None,
-                           type: str = methods.messages.File,
-                           thumb: bool = True,
-                           auto_delete: Optional[int] = None,
-                           parse_mode: Optional[str] = 'markdown',
-                           *args, **kwargs) -> messages.SendMessage:
+    async def upload(self, file: bytes, *args, **kwargs):
+        return await self._connection.c_upload_file(file=file, *args, **kwargs)
 
-        if object_guid.lower() in ('me', 'cloud', 'self'):
-            object_guid = self._guid
+    async def connect(self):
+        self._connection = CConnection(client=self)
 
-        if isinstance(message, str) and parse_mode == 'html':
-            message = html_to_markdown(message)
+        if self._auth and self._private_key is not None:
+            get_me = await self.get_me()
+            self._guid = get_me.user.user_guid
 
-        if file_inline:
-            if not isinstance(file_inline, Struct):
-                if isinstance(file_inline, str):
-                    async with aiofiles.open(file_inline, 'rb') as file:
-                        kwargs['file_name'] = kwargs.get(
-                            'file_name', os.path.basename(file_inline))
-                        file_inline = await file.read()
+        information = self._session.information()
+        self._logger.info(f'the session information was read {information}')
+        if information:
+            self._auth = information[1]
+            self._guid = information[2]
+            self._private_key = information[4]
+            if isinstance(information[3], str):
+                self._user_agent = information[3] or self._user_agent
 
-                if type == methods.messages.Music:
-                    thumb = None
-                    kwargs['time'] = kwargs.get('time', self.get_audio_duration(file_inline, kwargs.get('file_name')))
-
-                file_inline = await self.upload(file_inline, *args, **kwargs)
-                file_inline['type'] = type
-                file_inline['time'] = kwargs.get('time', 1)
-                file_inline['width'] = kwargs.get('width', 200)
-                file_inline['height'] = kwargs.get('height', 200)
-                file_inline['music_performer'] = kwargs.get('performer', '')
-
-                if isinstance(thumb, thumbnail.Thumbnail):
-                    file_inline['time'] = thumb.seconds
-                    file_inline['width'] = thumb.width
-                    file_inline['height'] = thumb.height
-                    file_inline['thumb_inline'] = thumb.to_base64()
-
-        result = await self(
-            methods.messages.SendMessage(
-                object_guid,
-                message=message,
-                file_inline=file_inline,
-                reply_to_message_id=reply_to_message_id))
-
-        if auto_delete is not None:
-            await asyncio.create_task(self.auto_delete_message(result.object_guid,
-                                                               result.message_id,
-                                                               auto_delete))
-
-        message = messages.SendMessage(**result.to_dict())
-        await message.set_shared_data(self, message)
-        return message
+        return self
 
     async def normalize_admins(self, guid):
         admins = self.groups_admins_list.get(guid, None)
@@ -252,11 +216,9 @@ class RubikaBot(Client):
     async def search_music(self, msg: Message):
         guid = msg.object_guid
         text = msg.message.text
-        path = await self.telebot.search_music(text)
-        res = await self.send_document(guid, path, caption=text)
-
-        print(res)
-        os.remove(path)
+        # path = await self.telebot.search_music(text)
+        res = await self.send_document(guid, r"D:\projects\python-project\rubika_manager_bot\Dele man Havato Karde .mp3", caption=text)
+        # os.remove(path)
 
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
@@ -343,6 +305,7 @@ class RubikaBot(Client):
 
     async def run_until_disconnected(self):
         await self.telebot.connect()
+        await self.connect()
         await self.start()
         if not await self.telebot.is_user_authorized():
             await self.telebot.signin()
