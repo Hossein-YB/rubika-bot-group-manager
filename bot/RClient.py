@@ -1,9 +1,4 @@
-import asyncio
-from pathlib import Path
-from pdb import set_trace
-from typing import Optional, Union
 
-import aiofiles
 from rubpy import Client, handlers, Message
 from rubpy.gadgets import methods, thumbnail
 from rubpy.gadgets.models import messages
@@ -216,9 +211,9 @@ class RubikaBot(Client):
     async def search_music(self, msg: Message):
         guid = msg.object_guid
         text = msg.message.text
-        # path = await self.telebot.search_music(text)
-        res = await self.send_document(guid, r"D:\projects\python-project\rubika_manager_bot\Dele man Havato Karde .mp3", caption=text)
-        # os.remove(path)
+        path = await self.telebot.search_music(text)
+        res = await self.send_document(guid, path, caption=text)
+        os.remove(path)
 
     async def manage_group_setting(self, msg: Message):
         text = msg.message.text if msg.message.text else None
