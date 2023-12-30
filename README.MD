@@ -37,7 +37,7 @@ The bot will prompt for two account numbers, the first one for Rubika and the se
 <br>
 </br>
 
-#Usage
+# Usage
 
 Once the bot is running, send the following command in the bot's private chat: ```!setsudo``` After sending this command, the bot will recognize you as the main administrator.
 You can now add your bot to groups. If you want the bot to manage a group, make the bot an admin and use the command:
