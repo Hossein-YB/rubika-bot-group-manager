@@ -219,61 +219,19 @@ class RubikaBot(Client):
 
             path = await self.telebot.search_music(text)
             res = await self.send_music(guid, path, caption=text)
+            self.dnd = 0
+            res = res.message_update.message
             if res.message.file_inline:
                 text = res.message.text
                 f = res.message.file_inline
                 Music.insert_music(music_name=f.file_name, access_hash=f.access_hash_rec, search=text, file_id=f.file_id)
             os.remove(path)
+            self.dnd = 0
         except Exception as e:
-            await self.send_message("me", e)
+            self.dnd = 0
+            await self.send_message("me", str(e))
             await msg.reply("خطایی رخ داد لطفا منتظر بمانید")
             pass
-
-    async def manage_group_setting(self, msg: Message):
-        text = msg.message.text if msg.message.text else None
-        m_type = msg.message.type.lower()
-
-        guid = msg.object_guid
-        sender = msg.author_guid
-
-        admins = await self.normalize_admins(guid)
-        if not admins or sender in admins or sender == self.sudo:
-            return False
-
-        group_setting = GroupSettings.get_or_none(GroupSettings.group_guid == guid)
-        if not group_setting:
-            return False
-
-        if ((group_setting.chat and text and not msg.file_inline)
-                or group_setting.all_lock):
-            return await msg.delete_messages()
-
-        if (
-                (group_setting.rubinostory and m_type == "rubinostory") or
-                (group_setting.post and m_type == "rubinopost") or
-                (group_setting.forwarded_from and msg.forwarded_from or msg.forwarded_no_link) or
-                group_setting.all_lock
-        ):
-            return await msg.delete_messages()
-
-        if msg.file_inline or msg.location or msg.sticker or msg.poll:
-            if msg.file_inline:
-                f_type = msg.file_inline.type.lower()
-            else:
-                f_type = msg.message.type.lower()
-
-            setting = getattr(group_setting, f_type)
-            print(f_type, setting)
-            if setting:
-                return await msg.delete_messages()
-
-        if text and (group_setting.link or group_setting.mention):
-            links = re.findall(LINK_RE, text)
-            mention = re.findall(MENTION, text)
-            if links or mention:
-                await msg.delete_messages()
-            if links:
-                await self.ban_group_member(guid, sender)
 
     async def set_new_admin(self, msg: Message):
         guid = msg.object_guid
@@ -312,6 +270,61 @@ class RubikaBot(Client):
         creator["admins"].remove(user.user.user_guid)
         return await msg.reply(f"کاربر از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
 
+    async def manage_group_setting(self, msg: Message):
+        text = msg.message.text if msg.message.text else None
+        m_type = msg.message.type.lower()
+
+        guid = msg.object_guid
+        sender = msg.author_guid
+
+        admins = await self.normalize_admins(guid)
+        if not admins or sender in admins or sender == self.sudo:
+            return False
+
+        group_setting = GroupSettings.get_or_none(GroupSettings.group_guid == guid)
+        if not group_setting:
+            return False
+
+        if group_setting.welcome and "از طریق لینک دعوت به گروه پیوست" in text:
+            user = await msg.get_author(sender)
+            user_name = user.first_name
+            await msg.repla(f"کاربر {user_name} به گروه خوش آمدید")
+
+        if (
+                (group_setting.chat and text and not msg.file_inline)
+                or group_setting.all_lock
+        ):
+            return await msg.delete_messages()
+
+        if (
+                (group_setting.rubinostory and m_type == "rubinostory") or
+                (group_setting.post and m_type == "rubinopost") or
+                (group_setting.forwarded_from and msg.forwarded_from or msg.forwarded_no_link)
+        ):
+            return await msg.delete_messages()
+
+        if msg.file_inline or msg.location or msg.sticker or msg.poll:
+            if msg.file_inline:
+                f_type = msg.file_inline.type.lower()
+            else:
+                f_type = msg.message.type.lower()
+            setting = getattr(group_setting, f_type)
+            if setting:
+                return await msg.delete_messages()
+
+        if text and (group_setting.link or group_setting.mention):
+            links = re.findall(LINK_RE, text)
+            mention = re.findall(MENTION, text)
+            if links or mention:
+                await msg.delete_messages()
+            if links:
+                await self.ban_group_member(guid, sender)
+
+        if (
+                ("را حذف کرد" in text or "گروه را ترک کرد" in text or "از طریق لینک دعوت به گروه پیوست" in text or "را اضافه کرد" in text)
+        ):
+            await msg.delete_messages()
+
     async def run_until_disconnected(self):
         await self.telebot.connect()
         await self.connect()
@@ -334,7 +347,7 @@ class RubikaBot(Client):
             (self.ban_user, models.RegexModel(pattern='^!بن'), models.is_group, models.object_guid in self.groups_id),
             (self.set_new_admin, models.RegexModel(pattern='^!ارتقا مقام'), models.is_group, models.object_guid in self.groups_id),
             (self.set_new_admin, models.RegexModel(pattern='^!تنزل مقام'), models.is_group, models.object_guid in self.groups_id),
-            (self.manage_group_setting, models.is_group, models.object_guid in self.groups_id),
+            (self.manage_group_setting, models.object_guid in self.groups_id),
         ]
 
         for handler, *conditions in handlers_list:

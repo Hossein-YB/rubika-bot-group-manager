@@ -112,8 +112,17 @@ class GroupSettings(BaseModel):
         'چت': "chat",
         'فروارد': "forwarded_from",
         'قفل گروه': "all_lock",
+        'خوشامد': "welcome",
+        'جوین': "join"
     }
     group_guid = ForeignKeyField(Group, Group.guid, on_delete="CASCADE")
+
+
+    link = BooleanField(default=True)
+    mention = BooleanField(default=True)
+    welcome = BooleanField(default=True)
+    join = BooleanField(default=True)
+
     gif = BooleanField(default=False)
     chat = BooleanField(default=False)
     video = BooleanField(default=False)
@@ -123,8 +132,6 @@ class GroupSettings(BaseModel):
     location = BooleanField(default=False)
     image = BooleanField(default=False)
     post = BooleanField(default=False)
-    link = BooleanField(default=True)
-    mention = BooleanField(default=True)
     sticker = BooleanField(default=False)
     poll = BooleanField(default=False)
     forwarded_from = BooleanField(default=False)
