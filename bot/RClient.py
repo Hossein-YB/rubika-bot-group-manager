@@ -27,17 +27,47 @@ class RubikaBot(Client):
             admins = []
         return admins
 
-    async def help_bot(self, msg: Updates, *args, **kwargs):
-
+    async def check_sender(self, msg: Updates):
         sender = msg.author_guid
-        if msg.is_group and sender != self.sudo:
-            guid = msg.object_guid
-            admins = await self.normalize_admins(guid)
-            if not admins or sender not in admins:
-                return False
+        guid_group = msg.object_guid
+
+        if sender == self.sudo:
+            return True
+
+        if not guid_group:
+            return False
+
+        group = self.groups_admins_list.get(guid_group, {'admins': []})
+        if sender in group['admins']:
+            return True
+        else:
+            return False
+
+    async def check_creator(self,  msg: Updates):
+        sender = msg.author_guid
+        guid_group = msg.object_guid
+
+        if sender == self.sudo:
+            return True
+
+        if not guid_group:
+            return False
+
+        group = self.groups_admins_list.get(guid_group, {'creator': ''})
+        if sender is group['creator']:
+            return True
+        else:
+            return False
+
+    async def help_bot(self, msg: Updates, *args, **kwargs):
+        check = await self.check_sender(msg)
+
+        if not check:
+            return False
+
         with open("./bot/help.txt", "r", encoding='utf-8') as f:
             help = f.read()
-        await msg.reply(help)
+        return await msg.reply(help)
 
     async def set_sudo_admin_bot(self, msg: Updates, *args, **kwargs):
         guid = msg.author_guid
@@ -45,7 +75,7 @@ class RubikaBot(Client):
             ad = await self.get_user_info(self.sudo)
             return await msg.reply(f"مدیر از قبل تنظیم شده است\n{ad.user.username}")
 
-        if Admin.insert_admin(guid):
+        if BotSettings.insert_sudo(guid):
             self.sudo = guid
             await msg.reply("مدیر تنظیم شد.")
         else:
@@ -53,9 +83,12 @@ class RubikaBot(Client):
 
     async def add_group_bot(self, msg: Updates, *args, **kwargs):
         sender = msg.author_guid
-        if sender != self.sudo:
-            return False
         guid_group = msg.object_guid
+        check = await self.check_sender(msg)
+
+        if not check:
+            return False
+
         if guid_group in self.groups_id and guid_group in self.groups_admins_list:
             return await msg.reply(f"گروه از قبل برای ربات تنظیم شده است.")
 
@@ -73,10 +106,9 @@ class RubikaBot(Client):
         sender = msg.author_guid
         creator = None
 
-        if self.groups_admins_list.get(guid_group, None):
-            creator = self.groups_admins_list.get(guid_group, None)['creator']
+        check = await self.check_creator(msg)
 
-        if sender != self.sudo or not sender != creator:
+        if not check:
             return False
 
         admins = await self.get_group_admin_members(guid_group)
@@ -93,83 +125,81 @@ class RubikaBot(Client):
         await msg.reply("به روز رسانی با موفقیت انجام شد.")
 
     async def get_lock_list(self, msg: Updates, *args, **kwargs):
-        guid = msg.object_guid
-        sender = msg.author_guid
-        admins = await self.normalize_admins(guid)
-        if not admins or sender not in admins or sender != self.sudo:
+        check = await self.check_creator(msg)
+
+        if not check:
             return False
+
         text = "لیست قفل های ربات:"
         for i in GroupSettings.names.keys():
-            text += f"\n`!قفل {i}`\t !بازکردن {i}"
+            text += f"\n`قفل {i}`\t بازکردن {i}"
         await msg.reply(text)
 
     async def unlock_all(self, msg: Updates, *args, **kwargs):
-        guid = msg.object_guid
-        sender = msg.author_guid
-        admins = await self.normalize_admins(guid)
-        if not admins or sender not in admins or sender != self.sudo:
+        check = await self.check_creator(msg)
+
+        if not check:
             return False
-        GroupSettings.update_all(guid, 0)
+
+        GroupSettings.update_all(msg.object_guid, 0)
         return await msg.reply("همه قفل ها باز شدند")
 
     async def group_status(self, msg: Updates, *args, **kwargs):
-        guid = msg.object_guid
-        sender = msg.author_guid
-        admins = await self.normalize_admins(guid)
-        if not admins or sender not in admins or sender != self.sudo:
+        check = await self.check_sender(msg)
+
+        if not check:
             return False
-        status = "وضعیت قفل های گروه به این ترتیب است:\n" + GroupSettings.get_group_status(guid)
+        status = "وضعیت قفل های گروه به این ترتیب است:\n" + GroupSettings.get_group_status(msg.object_guid)
         return await msg.reply(status)
 
     async def lock_group_setting(self, msg: Updates, *args, **kwargs):
-        guid = msg.object_guid
-        sender = msg.author_guid
-        admins = await self.normalize_admins(guid)
-        if not admins or sender not in admins or sender != self.sudo:
+        check = await self.check_sender(msg)
+
+        if not check:
             return False
 
-        lock_name = msg.message.text.replace("!قفل", "").strip()
+        lock_name = msg.message.text.replace("قفل", "").strip()
         en_lock_name = GroupSettings.names.get(lock_name, False)
         if en_lock_name:
             GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=True)
             await msg.reply(f"قفل {lock_name} فعال شد.")
 
     async def unlock_group_setting(self, msg: Updates, *args, **kwargs):
-        guid = msg.object_guid
-        sender = msg.author_guid
-        admins = await self.normalize_admins(guid)
-        if not admins or sender not in admins or sender != self.sudo:
+        check = await self.check_sender(msg)
+
+        if not check:
             return False
-        unlock_name = msg.message.text.replace("!بازکردن", "").strip()
+        unlock_name = msg.message.text.replace("بازکردن", "").strip()
         en_lock_name = GroupSettings.names.get(unlock_name, False)
         if en_lock_name:
             GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=False)
             await msg.reply(f"قفل {unlock_name} غیر فعال شد.")
 
     async def ban_user(self, msg: Updates, *args, **kwargs):
-        guid = msg.object_guid
-        sender = msg.author_guid
-        admins = await self.normalize_admins(guid)
-        if not admins or sender not in admins or sender != self.sudo:
+        check = await self.check_sender(msg)
+
+        if not check:
             return False
 
-        user = await self.get_messages_by_ID(guid, msg.message.reply_to_message_id)
+        user = await self.get_messages_by_id(msg.object_guid, msg.message.reply_to_message_id)
         user = user.messages[0].author_object_guid
         user = await self.get_user_info(user)
 
-        await self.ban_group_member(guid, user.user.user_guid)
+        await self.ban_group_member(msg.object_guid, user.user.user_guid)
         return await msg.reply(f"کاربر {user.user.first_name} با از گروه اخراج شد.")
 
     async def delete_all_messages(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
-        sender = msg.author_guid
-        admins = await self.normalize_admins(guid)
-        if not admins or sender not in admins or sender != self.sudo:
+        check = await self.check_sender(msg)
+
+        if not check:
             return False
+
         if guid not in self.group_delete_messages:
             self.group_delete_messages.append(guid)
         else:
             return False
+
         await msg.reply("شروع پاکسازی ...")
         while True:
             messages = await self.get_messages_interval(guid, msg.message_id)
@@ -183,41 +213,31 @@ class RubikaBot(Client):
         return await self.send_message(guid, "تمام پیام ها پاک شدند")
 
     async def set_new_admin(self, msg: Updates, *args, **kwargs):
-        guid = msg.object_guid
-        sender = msg.author_guid
-        creator = None
+        check = await self.check_creator(msg)
 
-        if self.groups_admins_list.get(guid, None):
-            creator = self.groups_admins_list.get(guid, None)
-
-        if sender != self.sudo or sender != creator['creator']:
+        if not check:
             return False
 
-        user = await self.get_messages_by_ID(guid, msg.message.reply_to_message_id)
+        guid = msg.object_guid
+        user = await self.get_messages_by_id(guid, msg.message.reply_to_message_id)
         user = user.messages[0].author_object_guid
         user = await self.get_user_info(user)
         GroupAdmin.insert_group_admin(user.user.user_guid, guid)
-        creator["admins"].append(user.user.user_guid)
-        return await msg.reply(f"کاربر به لیست ادمین های ربات در گروه اضافه شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
+        self.groups_admins_list["admins"].append(user.user.user_guid)
+        return await msg.reply(f"کاربر به لیست ادمین های ربات در گروه اضافه شد\nتعداد مدیران ربات در این گروه{len(self.groups_admins_list['admins'])}")
 
     async def delete_admin(self, msg: Updates, *args, **kwargs):
-        print(msg)
-        guid = msg.object_guid
-        sender = msg.author_guid
-        creator = None
-
-        if self.groups_admins_list.get(guid, None):
-            creator = self.groups_admins_list.get(guid, None)
-
-        if sender != self.sudo or sender != creator['creator']:
+        check = await self.check_creator(msg)
+        if not check:
             return False
+        guid = msg.object_guid
 
-        user = await self.get_messages_by_ID(guid, msg.message.reply_to_message_id)
+        user = await self.get_messages_by_id(guid, msg.message.reply_to_message_id)
         user = user.messages[0].author_object_guid
         user = await self.get_user_info(user)
         GroupAdmin.delete_group_admin(user.user.user_guid, guid)
-        creator["admins"].remove(user.user.user_guid)
-        return await msg.reply(f"کاربر از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
+        self.groups_admins_list["admins"].remove(user.user.user_guid)
+        return await msg.reply(f"کاربر از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(self.groups_admins_list['admins'])}")
 
     async def manage_group_setting(self, msg: Updates, *args, **kwargs):
         text = msg.message.text if msg.message.text else None
@@ -275,7 +295,6 @@ class RubikaBot(Client):
             await msg.delete_messages()
 
     def run(self):
-        
         self.add_handler(
             func=self.help_bot,
             handler=handlers.MessageUpdates(filters.RegexModel('^راهنما$')))

@@ -73,7 +73,7 @@ class Group(BaseModel):
 
 class GroupAdmin(BaseModel):
     """A model to store group admins guid """
-    admin_guid = CharField(max_length=250, unique=True)
+    admin_guid = CharField(max_length=250)
     is_mein_admin = BooleanField(default=False)
     group_guid = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE")
 
@@ -81,7 +81,7 @@ class GroupAdmin(BaseModel):
     def insert_group_admin(cls, a_guid, g_guid, is_sudo=False):
         group = cls.get_or_none(cls.admin_guid == a_guid, cls.group_guid == g_guid)
         if not group and a_guid and g_guid:
-            cls.create(admin_guid=a_guid, group_guid=g_guid, is_sudo=is_sudo)
+            cls.create(admin_guid=a_guid, group_guid=g_guid, is_mein_admin=is_sudo)
             return True
         else:
             return False
@@ -101,12 +101,12 @@ class GroupAdmin(BaseModel):
         groups_admin = dict()
         if admins:
             for admin in admins:
-                if not groups_admin.get(admin.group_id.guid, None):
-                    groups_admin[admin.group_id.guid] = {'admins': [], "creator": ""}
+                if not groups_admin.get(admin.group_guid.group_guid, None):
+                    groups_admin[admin.group_guid.group_guid] = {'admins': [], "creator": ""}
 
-                groups_admin[admin.group_id.guid]['admins'].append(admin.guid)
-                if admin.is_sudo:
-                    groups_admin[admin.group_id.guid]['creator'] = admin.guid
+                groups_admin[admin.group_guid.group_guid]['admins'].append(admin.admin_guid)
+                if admin.is_mein_admin:
+                    groups_admin[admin.group_guid.group_guid]['creator'] = admin.admin_guid
 
             return groups_admin
         else:
@@ -115,7 +115,7 @@ class GroupAdmin(BaseModel):
     @classmethod
     def get_group_admins(cls, group_guid):
         admins = cls.select(cls.group_guid == group_guid)
-        list_admins = [ad.guid for ad in admins]
+        list_admins = [ad.admin_guid for ad in admins]
         return list_admins
 
 
