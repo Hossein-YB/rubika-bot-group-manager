@@ -1,42 +1,23 @@
-from rubpy import Client, handlers, Message
-from rubpy import models
-from bot.connection import CConnection
+from rubpy import Client, handlers, filters
+from rubpy.types import Updates
+from db.models import BotSettings, Group, GroupAdmin, GroupSettings
+
 from bot.tools import LINK_RE, MENTION
-from db.models import Admin, Group, GroupAdmin, GroupSettings, Music
 import re
 
 
 class RubikaBot(Client):
     def __init__(self, session: str, *args, **kwargs):
         self.dnd = None
-        self.sudo = Admin.get_sudo()
+        self.sudo = BotSettings.get_sudo()
         self.groups_id = Group.get_groups_list()
         self.groups_admins_list = GroupAdmin.get_groups_admins_list()
         self.group_delete_messages = []
+        
         print(
             f"{'#---#' * 20}\nsudo -> {self.sudo}\ngroup -> {self.groups_id}\ngroups admins -> {self.groups_admins_list}\n{'#---#' * 20}")
+        
         super().__init__(session, *args, **kwargs)
-
-    async def upload(self, file: bytes, *args, **kwargs):
-        return await self._connection.c_upload_file(file=file, *args, **kwargs)
-
-    async def connect(self):
-        self._connection = CConnection(client=self)
-
-        if self._auth and self._private_key is not None:
-            get_me = await self.get_me()
-            self._guid = get_me.user.user_guid
-
-        information = self._session.information()
-        self._logger.info(f'the session information was read {information}')
-        if information:
-            self._auth = information[1]
-            self._guid = information[2]
-            self._private_key = information[4]
-            if isinstance(information[3], str):
-                self._user_agent = information[3] or self._user_agent
-
-        return self
 
     async def normalize_admins(self, guid):
         admins = self.groups_admins_list.get(guid, None)
@@ -46,7 +27,7 @@ class RubikaBot(Client):
             admins = []
         return admins
 
-    async def help_bot(self, msg: Message):
+    async def help_bot(self, msg: Updates, *args, **kwargs):
 
         sender = msg.author_guid
         if msg.is_group and sender != self.sudo:
@@ -58,7 +39,7 @@ class RubikaBot(Client):
             help = f.read()
         await msg.reply(help)
 
-    async def set_sudo_admin_bot(self, msg: Message):
+    async def set_sudo_admin_bot(self, msg: Updates, *args, **kwargs):
         guid = msg.author_guid
         if self.sudo:
             ad = await self.get_user_info(self.sudo)
@@ -70,7 +51,7 @@ class RubikaBot(Client):
         else:
             await msg.reply("مشکلی رخ داد.")
 
-    async def add_group_bot(self, msg: Message):
+    async def add_group_bot(self, msg: Updates, *args, **kwargs):
         sender = msg.author_guid
         if sender != self.sudo:
             return False
@@ -87,7 +68,7 @@ class RubikaBot(Client):
 
         return await self.update_group_admin(msg)
 
-    async def update_group_admin(self, msg: Message):
+    async def update_group_admin(self, msg: Updates, *args, **kwargs):
         guid_group = msg.object_guid
         sender = msg.author_guid
         creator = None
@@ -111,7 +92,7 @@ class RubikaBot(Client):
         print(self.groups_admins_list)
         await msg.reply("به روز رسانی با موفقیت انجام شد.")
 
-    async def get_lock_list(self, msg: Message):
+    async def get_lock_list(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
@@ -122,7 +103,7 @@ class RubikaBot(Client):
             text += f"\n`!قفل {i}`\t !بازکردن {i}"
         await msg.reply(text)
 
-    async def unlock_all(self, msg: Message):
+    async def unlock_all(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
@@ -131,7 +112,7 @@ class RubikaBot(Client):
         GroupSettings.update_all(guid, 0)
         return await msg.reply("همه قفل ها باز شدند")
 
-    async def group_status(self, msg: Message):
+    async def group_status(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
@@ -140,7 +121,7 @@ class RubikaBot(Client):
         status = "وضعیت قفل های گروه به این ترتیب است:\n" + GroupSettings.get_group_status(guid)
         return await msg.reply(status)
 
-    async def lock_group_setting(self, msg: Message):
+    async def lock_group_setting(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
@@ -153,7 +134,7 @@ class RubikaBot(Client):
             GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=True)
             await msg.reply(f"قفل {lock_name} فعال شد.")
 
-    async def unlock_group_setting(self, msg: Message):
+    async def unlock_group_setting(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
@@ -165,7 +146,7 @@ class RubikaBot(Client):
             GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=False)
             await msg.reply(f"قفل {unlock_name} غیر فعال شد.")
 
-    async def ban_user(self, msg: Message):
+    async def ban_user(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
@@ -179,7 +160,7 @@ class RubikaBot(Client):
         await self.ban_group_member(guid, user.user.user_guid)
         return await msg.reply(f"کاربر {user.user.first_name} با از گروه اخراج شد.")
 
-    async def delete_all_messages(self, msg: Message):
+    async def delete_all_messages(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         admins = await self.normalize_admins(guid)
@@ -201,7 +182,7 @@ class RubikaBot(Client):
 
         return await self.send_message(guid, "تمام پیام ها پاک شدند")
 
-    async def set_new_admin(self, msg: Message):
+    async def set_new_admin(self, msg: Updates, *args, **kwargs):
         guid = msg.object_guid
         sender = msg.author_guid
         creator = None
@@ -219,7 +200,7 @@ class RubikaBot(Client):
         creator["admins"].append(user.user.user_guid)
         return await msg.reply(f"کاربر به لیست ادمین های ربات در گروه اضافه شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
 
-    async def delete_admin(self, msg: Message):
+    async def delete_admin(self, msg: Updates, *args, **kwargs):
         print(msg)
         guid = msg.object_guid
         sender = msg.author_guid
@@ -238,7 +219,7 @@ class RubikaBot(Client):
         creator["admins"].remove(user.user.user_guid)
         return await msg.reply(f"کاربر از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(creator['admins'])}")
 
-    async def manage_group_setting(self, msg: Message):
+    async def manage_group_setting(self, msg: Updates, *args, **kwargs):
         text = msg.message.text if msg.message.text else None
         m_type = msg.message.type.lower()
 
@@ -293,64 +274,62 @@ class RubikaBot(Client):
         ):
             await msg.delete_messages()
 
-    async def run_until_disconnected(self):
-        await self.connect()
-        await self.start()
+    def run(self):
         
         self.add_handler(
             func=self.help_bot,
-            handler=handlers.MessageUpdates(models.RegexModel('^راهنما$')))
+            handler=handlers.MessageUpdates(filters.RegexModel('^راهنما$')))
         
         self.add_handler(
             func=self.set_sudo_admin_bot,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^setsudo$'), models.is_private))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^setsudo$'), filters.is_private))
         
         self.add_handler(
             func=self.add_group_bot,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^setgroup$'), models.is_group))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^setgroup$'), filters.is_group))
         
         self.add_handler(
             func=self.update_group_admin,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^به روزرسانی مدیران$'), models.is_group))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^به روزرسانی مدیران$'), filters.is_group))
         
         self.add_handler(
             func=self.lock_group_setting,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^قفل '), models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^قفل '), filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.get_lock_list,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^لیست قفل ها$'), models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^لیست قفل ها$'), filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.unlock_group_setting,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^بازکردن '), models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بازکردن '), filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.unlock_all,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^بازکردن همه'), models.is_group, models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بازکردن همه'), filters.is_group, filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.delete_all_messages,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^پاک کردن پیام ها'), models.is_group, models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^پاک کردن پیام ها'), filters.is_group, filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.group_status,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^وضعیت'), models.is_group, models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^وضعیت'), filters.is_group, filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.ban_user,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^بن'), models.is_group, models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بن'), filters.is_group, filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.set_new_admin,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^ارتقا مقام'), models.is_group, models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^ارتقا مقام'), filters.is_group, filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.set_new_admin,
-            handler=handlers.MessageUpdates(models.RegexModel(pattern='^تنزل مقام'), models.is_group, models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^تنزل مقام'), filters.is_group, filters.object_guid in self.groups_id))
         
         self.add_handler(
             func=self.manage_group_setting,
-            handler=handlers.MessageUpdates(models.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.object_guid in self.groups_id))
 
-        return await super().run_until_disconnected()
+        return super().run()
