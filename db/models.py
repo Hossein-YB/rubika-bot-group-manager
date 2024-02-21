@@ -1,6 +1,14 @@
-from peewee import SqliteDatabase, Model, CharField, ForeignKeyField, BooleanField
+import datetime
+from peewee import MySQLDatabase, Model, CharField, ForeignKeyField, BooleanField, DateTimeField
+from playhouse.shortcuts import ReconnectMixin
 
-database = SqliteDatabase("bot_db.sqlite3")
+
+class ReconnectMySQLDatabase(ReconnectMixin, MySQLDatabase):
+    pass
+
+
+database = ReconnectMySQLDatabase(database="rubika", host="127.0.0.1", user="rubika_user",
+                                  password='rubika@919', port=3306)
 
 
 class BaseModel(Model):
@@ -8,12 +16,13 @@ class BaseModel(Model):
         database = database
 
 
-class Admin(BaseModel):
-    guid = CharField(max_length=250, unique=True)
+class BotSettings(BaseModel):
+    """save bot base settings like main admin"""
+    sudo_guid = CharField(max_length=250, unique=True)
 
     @classmethod
-    def insert_admin(cls, guid):
-        user = cls.get_or_none(cls.guid == guid)
+    def insert_sudo(cls, guid):
+        user = cls.get_or_none(cls.sudo_guid == guid)
         if not user and guid:
             cls.create(guid=guid)
             return True
@@ -22,21 +31,30 @@ class Admin(BaseModel):
 
     @classmethod
     def get_sudo(cls):
-        user = cls.get_or_none()
+        user = cls.select()
         if user:
-            return user.guid
+            su = [sudo.sudo_guid for sudo in user]
+            if len(su) > 1:
+                return su
+            else:
+                return su[0]
         else:
             return None
 
+    class Meta:
+        db_table = 'bot_setting'
+
 
 class Group(BaseModel):
-    guid = CharField(max_length=250, unique=True)
+    """A model to store information about the group in which the robot is active"""
+    group_guid = CharField(max_length=250, unique=True)
+    date_active = DateTimeField(default=datetime.datetime.now())
 
     @classmethod
     def insert_group(cls, guid):
-        group = cls.get_or_none(cls.guid == guid)
+        group = cls.get_or_none(cls.group_guid == guid)
         if not group and guid:
-            cls.create(guid=guid)
+            cls.create(group_guid=guid)
             return True
         else:
             return False
@@ -47,29 +65,30 @@ class Group(BaseModel):
         groups_ids = []
         if groups:
             for group in groups:
-                groups_ids.append(group.guid)
+                groups_ids.append(group.group_guid)
             return groups_ids
         else:
             return groups_ids
 
 
 class GroupAdmin(BaseModel):
-    guid = CharField(max_length=250, unique=True)
-    is_sudo = BooleanField(default=False)
-    group_id = ForeignKeyField(Group, Group.guid, on_delete="CASCADE")
+    """A model to store group admins guid """
+    admin_guid = CharField(max_length=250, unique=True)
+    is_mein_admin = BooleanField(default=False)
+    group_guid = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE")
 
     @classmethod
     def insert_group_admin(cls, a_guid, g_guid, is_sudo=False):
-        group = cls.get_or_none(cls.guid == a_guid, cls.group_id == g_guid)
+        group = cls.get_or_none(cls.admin_guid == a_guid, cls.group_guid == g_guid)
         if not group and a_guid and g_guid:
-            cls.create(guid=a_guid, group_id=g_guid, is_sudo=is_sudo)
+            cls.create(admin_guid=a_guid, group_guid=g_guid, is_sudo=is_sudo)
             return True
         else:
             return False
 
     @classmethod
     def delete_group_admin(cls, a_guid, g_guid):
-        group = cls.get_or_none(cls.guid == a_guid, cls.group_id == g_guid)
+        group = cls.get_or_none(cls.admin_guid == a_guid, cls.group_guid == g_guid)
         if group:
             group.delete_instance()
             return True
@@ -93,8 +112,15 @@ class GroupAdmin(BaseModel):
         else:
             return groups_admin
 
+    @classmethod
+    def get_group_admins(cls, group_guid):
+        admins = cls.select(cls.group_guid == group_guid)
+        list_admins = [ad.guid for ad in admins]
+        return list_admins
+
 
 class GroupSettings(BaseModel):
+    """A model to store group settings """
     names = {
         'گیف': "gif",
         'ویدیو': "video",
@@ -115,8 +141,8 @@ class GroupSettings(BaseModel):
         'خوشامد': "welcome",
         'جوین': "join"
     }
-    group_guid = ForeignKeyField(Group, Group.guid, on_delete="CASCADE")
 
+    group_guid = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE")
 
     link = BooleanField(default=True)
     mention = BooleanField(default=True)
@@ -173,21 +199,10 @@ class GroupSettings(BaseModel):
         text = ""
         for key, val in cls.names.items():
             if getattr(group_setting, val):
-                status = "فعال"
+                status = "✅"
             else:
-                status = "باز "
+                status = "❌ "
 
-            text += f"وضعیت قفل {key} {status} است\n"
+            text += f"{key}: {status} \n"
 
         return text
-
-
-class Music(BaseModel):
-    music_name = CharField(max_length=1240)
-    access_hash = CharField(max_length=255)
-    search = CharField(max_length=500)
-    file_id = CharField(max_length=100)
-
-    @classmethod
-    def insert_music(cls, music_name, access_hash, search, file_id):
-        cls.create(music_name=music_name, access_hash=access_hash, search=search, file_id=file_id)

@@ -1,6 +1,6 @@
-from .models import database, Admin, Group, GroupAdmin, GroupSettings, Music
+from .models import database, BotSettings, Group, GroupAdmin, GroupSettings
 
 
 def create_table():
     with database:
-        database.create_tables([Admin, Group, GroupAdmin, GroupSettings, Music])
+        database.create_tables([BotSettings, Group, GroupAdmin, GroupSettings, ])
