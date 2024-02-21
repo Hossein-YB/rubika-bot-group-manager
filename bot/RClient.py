@@ -1,22 +1,18 @@
 from rubpy import Client, handlers, Message
-from rubpy.structs import models
-
+from rubpy import models
 from bot.connection import CConnection
-from bot.telegram_bot import TeleBot
 from bot.tools import LINK_RE, MENTION
 from db.models import Admin, Group, GroupAdmin, GroupSettings, Music
 import re
-import os
 
 
 class RubikaBot(Client):
-    def __init__(self, session: str, api_id, api_hash, *args, **kwargs):
+    def __init__(self, session: str, *args, **kwargs):
         self.dnd = None
         self.sudo = Admin.get_sudo()
         self.groups_id = Group.get_groups_list()
         self.groups_admins_list = GroupAdmin.get_groups_admins_list()
         self.group_delete_messages = []
-        self.telebot = TeleBot("telegram-session", api_id=api_id, api_hash=api_hash)
         print(
             f"{'#---#' * 20}\nsudo -> {self.sudo}\ngroup -> {self.groups_id}\ngroups admins -> {self.groups_admins_list}\n{'#---#' * 20}")
         super().__init__(session, *args, **kwargs)
@@ -205,34 +201,6 @@ class RubikaBot(Client):
 
         return await self.send_message(guid, "تمام پیام ها پاک شدند")
 
-    async def search_music(self, msg: Message):
-        if self.dnd:
-            return await self.send_message("ربات مشغول است لطفا چن لحظه دیگر دوباره تلاش کنید")
-        self.dnd = 1
-        guid = msg.object_guid
-        text = msg.message.text
-        try:
-            for i in ('اهنگ', 'آهنگ', 'موسیقی', 'موزیک'):
-                if i in text:
-                    x = "!" + i
-                    text = text.replace(x, "").split()
-
-            path = await self.telebot.search_music(text)
-            res = await self.send_music(guid, path, caption=text)
-            self.dnd = 0
-            res = res.message_update.message
-            if res.message.file_inline:
-                text = res.message.text
-                f = res.message.file_inline
-                Music.insert_music(music_name=f.file_name, access_hash=f.access_hash_rec, search=text, file_id=f.file_id)
-            os.remove(path)
-            self.dnd = 0
-        except Exception as e:
-            self.dnd = 0
-            await self.send_message("me", str(e))
-            await msg.reply("خطایی رخ داد لطفا منتظر بمانید")
-            pass
-
     async def set_new_admin(self, msg: Message):
         guid = msg.object_guid
         sender = msg.author_guid
@@ -326,31 +294,63 @@ class RubikaBot(Client):
             await msg.delete_messages()
 
     async def run_until_disconnected(self):
-        await self.telebot.connect()
         await self.connect()
         await self.start()
-        if not await self.telebot.is_user_authorized():
-            await self.telebot.signin()
-
-        handlers_list = [
-            (self.help_bot, models.RegexModel('^!راهنما$')),
-            (self.set_sudo_admin_bot, models.RegexModel(pattern='^!setsudo$'), models.is_private),
-            (self.add_group_bot, models.RegexModel(pattern='^!setgroup$'), models.is_group),
-            (self.search_music, models.RegexModel(pattern='^!(اهنگ|آهنگ|موسیقی|موزیک)'), models.is_group),
-            (self.update_group_admin, models.RegexModel(pattern='^!به روزرسانی مدیران$'), models.is_group),
-            (self.lock_group_setting, models.RegexModel(pattern='^!قفل '), models.object_guid in self.groups_id),
-            (self.get_lock_list, models.RegexModel(pattern='^!لیست قفل ها$'), models.object_guid in self.groups_id),
-            (self.unlock_group_setting, models.RegexModel(pattern='^!بازکردن '), models.object_guid in self.groups_id),
-            (self.unlock_all, models.RegexModel(pattern='^!بازکردن همه'), models.is_group, models.object_guid in self.groups_id),
-            (self.delete_all_messages, models.RegexModel(pattern='^!پاک کردن پیام ها'), models.is_group, models.object_guid in self.groups_id),
-            (self.group_status, models.RegexModel(pattern='^!وضعیت'), models.is_group, models.object_guid in self.groups_id),
-            (self.ban_user, models.RegexModel(pattern='^!بن'), models.is_group, models.object_guid in self.groups_id),
-            (self.set_new_admin, models.RegexModel(pattern='^!ارتقا مقام'), models.is_group, models.object_guid in self.groups_id),
-            (self.set_new_admin, models.RegexModel(pattern='^!تنزل مقام'), models.is_group, models.object_guid in self.groups_id),
-            (self.manage_group_setting, models.object_guid in self.groups_id),
-        ]
-
-        for handler, *conditions in handlers_list:
-            self.add_handler(handler, handlers.MessageUpdates(*conditions))
+        
+        self.add_handler(
+            func=self.help_bot,
+            handler=handlers.MessageUpdates(models.RegexModel('^راهنما$')))
+        
+        self.add_handler(
+            func=self.set_sudo_admin_bot,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^setsudo$'), models.is_private))
+        
+        self.add_handler(
+            func=self.add_group_bot,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^setgroup$'), models.is_group))
+        
+        self.add_handler(
+            func=self.update_group_admin,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^به روزرسانی مدیران$'), models.is_group))
+        
+        self.add_handler(
+            func=self.lock_group_setting,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^قفل '), models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.get_lock_list,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^لیست قفل ها$'), models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.unlock_group_setting,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^بازکردن '), models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.unlock_all,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^بازکردن همه'), models.is_group, models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.delete_all_messages,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^پاک کردن پیام ها'), models.is_group, models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.group_status,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^وضعیت'), models.is_group, models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.ban_user,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^بن'), models.is_group, models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.set_new_admin,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^ارتقا مقام'), models.is_group, models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.set_new_admin,
+            handler=handlers.MessageUpdates(models.RegexModel(pattern='^تنزل مقام'), models.is_group, models.object_guid in self.groups_id))
+        
+        self.add_handler(
+            func=self.manage_group_setting,
+            handler=handlers.MessageUpdates(models.object_guid in self.groups_id))
 
         return await super().run_until_disconnected()
