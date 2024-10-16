@@ -1,6 +1,8 @@
 import datetime
-from peewee import MySQLDatabase, Model, CharField, ForeignKeyField, BooleanField, DateTimeField
+from peewee import MySQLDatabase, Model, CharField, ForeignKeyField, BooleanField, DateTimeField, IntegerField
 from playhouse.shortcuts import ReconnectMixin
+
+from bot.tools import error_writer
 
 
 class ReconnectMySQLDatabase(ReconnectMixin, MySQLDatabase):
@@ -16,33 +18,31 @@ class BaseModel(Model):
         database = database
 
 
-class BotSettings(BaseModel):
-    """save bot base settings like main admin"""
+class SudoBot(BaseModel):
     sudo_guid = CharField(max_length=250, unique=True)
+    base_sudo = BooleanField(default=False)
 
     @classmethod
-    def insert_sudo(cls, guid):
+    def insert_sudo(cls, guid, base_sudo):
         user = cls.get_or_none(cls.sudo_guid == guid)
         if not user and guid:
-            cls.create(guid=guid)
+            cls.create(sudo_guid=guid, base_sudo=base_sudo)
             return True
         else:
             return False
 
     @classmethod
-    def get_sudo(cls):
+    def get_list(cls):
         user = cls.select()
         if user:
             su = [sudo.sudo_guid for sudo in user]
-            if len(su) > 1:
-                return su
-            else:
-                return su[0]
+            return su[0]
         else:
             return None
 
-    class Meta:
-        db_table = 'bot_setting'
+    @classmethod
+    def get_main_su(cls):
+        return cls.get_or_none(cls.base_sudo == True)
 
 
 class Group(BaseModel):
@@ -69,6 +69,25 @@ class Group(BaseModel):
             return groups_ids
         else:
             return groups_ids
+
+
+class Users(BaseModel):
+    user_guid = CharField(max_length=250)
+    warning = IntegerField(default=0)
+    silent = BooleanField(default=False)
+    group_guid = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE")
+
+    @classmethod
+    def insert_user(cls, user_guid, group_guid):
+        try:
+            cls.insert(user_guid=user_guid, group_guidn=group_guid)
+        except Exception as e:
+            error_writer(e, 'insert_user')
+            pass
+
+    @classmethod
+    def get_user(cls, user_guid, group_guid):
+        return cls.get_or_none(cls.user_guid == user_guid, cls.group_guid == group_guid)
 
 
 class GroupAdmin(BaseModel):
