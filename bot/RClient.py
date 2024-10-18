@@ -92,6 +92,29 @@ class RubikaBot(Client):
 
         await msg.reply(text)
 
+    async def lock_group_setting(self, msg: Updates):
+        check = await self.check_sender(msg)
+
+        if not check:
+            return False
+
+        lock_name = msg.message.text.replace(self.text.lock, "").strip()
+        en_lock_name = GroupSettings.names.get(lock_name, False)
+        if en_lock_name:
+            GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=True)
+            await msg.reply(self.text.active_lock.format(lock_name))
+
+    async def unlock_group_setting(self, msg: Updates):
+        check = await self.check_sender(msg)
+
+        if not check:
+            return False
+        unlock_name = msg.message.text.replace(self.text.un_lock, "").strip()
+        en_lock_name = GroupSettings.names.get(unlock_name, False)
+        if en_lock_name:
+            GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=False)
+            await msg.reply(self.text.deactive_lock.format(unlock_name))
+
     async def unlock_all(self, msg: Updates):
         check = await self.check_sender(msg)
 
@@ -109,41 +132,19 @@ class RubikaBot(Client):
         status = "وضعیت قفل های گروه به این ترتیب است:\n" + GroupSettings.get_group_status(msg.object_guid)
         return await msg.reply(status)
 
-    async def lock_group_setting(self, msg: Updates):
-        check = await self.check_sender(msg)
-
-        if not check:
-            return False
-
-        lock_name = msg.message.text.replace("قفل", "").strip()
-        en_lock_name = GroupSettings.names.get(lock_name, False)
-        if en_lock_name:
-            GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=True)
-            await msg.reply(f"قفل {lock_name} فعال شد.")
-
-    async def unlock_group_setting(self, msg: Updates):
-        check = await self.check_sender(msg)
-
-        if not check:
-            return False
-        unlock_name = msg.message.text.replace("بازکردن", "").strip()
-        en_lock_name = GroupSettings.names.get(unlock_name, False)
-        if en_lock_name:
-            GroupSettings.update_setting(msg.object_guid, setting_name=en_lock_name, status=False)
-            await msg.reply(f"قفل {unlock_name} غیر فعال شد.")
-
     async def ban_user(self, msg: Updates):
         check = await self.check_sender(msg)
 
         if not check:
             return False
 
-        msg = await self.get_messages_by_id(msg.object_guid, msg.message.reply_to_message_id)
-        user = msg.messages
-        user = await self.get_user_info(user)
+        get_reply = await self.get_messages_by_id(msg.object_guid, msg.message.reply_to_message_id)
+        get_reply = get_reply.messages[0] if len(get_reply.messages) > 0 else get_reply.messages
+        user = await self.get_user_info(get_reply.author_object_guid)
 
+        await self.delete_messages(msg.object_guid, [get_reply.message_id])
         await self.ban_group_member(msg.object_guid, user.user.user_guid)
-        return await msg.reply(f"کاربر {user.user.first_name} با از گروه اخراج شد.")
+        return await msg.reply(self.text.ban_user.format(user.user.first_name))
 
     async def delete_all_messages(self, msg: Updates):
         guid = msg.object_guid
@@ -258,20 +259,21 @@ class RubikaBot(Client):
             handler=handlers.MessageUpdates(filters.RegexModel('^راهنما$')))
 
         self.add_handler(
-            func=self.add_group,
+            func=self.add_new_group,
             handler=handlers.MessageUpdates(filters.RegexModel(pattern=r'^setgroup$'), filters.is_group))
 
         self.add_handler(
             func=self.update_group_admin,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^به روزرسانی مدیران$'), filters.is_group))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بروزرسانی مدیران$'), filters.is_group))
+
+        self.add_handler(
+            func=self.get_lock_list,
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^لیست قفل ها$'),
+                                            filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.lock_group_setting,
             handler=handlers.MessageUpdates(filters.RegexModel(pattern='^قفل '), filters.object_guid in self.groups_id))
-
-        self.add_handler(
-            func=self.get_lock_list,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^لیست قفل ها$'), filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.unlock_group_setting,
@@ -282,12 +284,13 @@ class RubikaBot(Client):
             handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بازکردن همه'), filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
-            func=self.delete_all_messages,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^پاک کردن پیام ها'), filters.is_group, filters.object_guid in self.groups_id))
-
-        self.add_handler(
             func=self.group_status,
             handler=handlers.MessageUpdates(filters.RegexModel(pattern='^وضعیت'), filters.is_group, filters.object_guid in self.groups_id))
+
+        self.add_handler(
+            func=self.delete_all_messages,
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^حذف تاریخچه'), filters.is_group, filters.object_guid in self.groups_id))
+
 
         self.add_handler(
             func=self.ban_user,
