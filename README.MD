@@ -24,6 +24,15 @@ To install the bot, you need to clone the repository:
 ```bash
 git clone https://github.com/Hossein-YB/rubika-bot-group-manager
 ```
+Create a database in mysql
+
+```sql
+CREATE DATABASE irpytho1_rubika_v_2;
+CREATE USER 'irpytho1_rubika_v2'@'%' IDENTIFIED WITH mysql_native_password BY "rubika@v2";
+GRANT ALL ON irpytho1_rubika_v_2.* TO 'irpytho1_rubika_v2'@'%'; 
+flush privileges;
+```
+
 Then install the required packages:
 ```bash
 pip install -r requirements.txt

@@ -1,5 +1,6 @@
 import datetime
-from peewee import MySQLDatabase, Model, CharField, ForeignKeyField, BooleanField, DateTimeField, IntegerField
+from peewee import MySQLDatabase, Model, CharField, ForeignKeyField, BooleanField, DateTimeField, IntegerField, \
+    TextField, CompositeKey
 from playhouse.shortcuts import ReconnectMixin
 
 from bot.tools import error_writer
@@ -9,8 +10,8 @@ class ReconnectMySQLDatabase(ReconnectMixin, MySQLDatabase):
     pass
 
 
-database = ReconnectMySQLDatabase(database="rubika", host="127.0.0.1", user="rubika_user",
-                                  password='rubika@919', port=3306)
+database = ReconnectMySQLDatabase(database="irpytho1_rubika_v_2", host="127.0.0.1", user="irpytho1_rubika_v2",
+                                  password='rubika@v2', port=3333)
 
 
 class BaseModel(Model):
@@ -42,7 +43,8 @@ class SudoBot(BaseModel):
 
     @classmethod
     def get_main_su(cls):
-        return cls.get_or_none(cls.base_sudo == True)
+        user = cls.get_or_none(cls.base_sudo == True)
+        return user.sudo_guid
 
 
 class Group(BaseModel):
@@ -62,17 +64,15 @@ class Group(BaseModel):
     @classmethod
     def get_groups_list(cls):
         groups = cls.select()
-        groups_ids = []
         if groups:
-            for group in groups:
-                groups_ids.append(group.group_guid)
-            return groups_ids
+            return [group.group_guid for group in groups]
         else:
-            return groups_ids
+            return []
 
 
 class Users(BaseModel):
     user_guid = CharField(max_length=250)
+    is_special = BooleanField(default=False)
     warning = IntegerField(default=0)
     silent = BooleanField(default=False)
     group_guid = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE")
@@ -88,6 +88,10 @@ class Users(BaseModel):
     @classmethod
     def get_user(cls, user_guid, group_guid):
         return cls.get_or_none(cls.user_guid == user_guid, cls.group_guid == group_guid)
+
+    class Meta:
+        database = database
+        primary_key = CompositeKey('user_guid', 'group_guid')
 
 
 class GroupAdmin(BaseModel):
@@ -115,21 +119,24 @@ class GroupAdmin(BaseModel):
             return False
 
     @classmethod
-    def get_groups_admins_list(cls):
+    def admins_list(cls):
         admins = cls.select()
-        groups_admin = dict()
-        if admins:
-            for admin in admins:
-                if not groups_admin.get(admin.group_guid.group_guid, None):
-                    groups_admin[admin.group_guid.group_guid] = {'admins': [], "creator": ""}
+        groups_admin = {}
 
-                groups_admin[admin.group_guid.group_guid]['admins'].append(admin.admin_guid)
-                if admin.is_mein_admin:
-                    groups_admin[admin.group_guid.group_guid]['creator'] = admin.admin_guid
+        if not admins:
+            return groups_admin
 
-            return groups_admin
-        else:
-            return groups_admin
+        for admin in admins:
+
+            if not groups_admin.get(admin.group_guid.group_guid, None):
+                groups_admin[admin.group_guid.group_guid] = {'admins': [], "creator": ""}
+
+            groups_admin[admin.group_guid.group_guid]['admins'].append(admin.admin_guid)
+
+            if admin.is_mein_admin:
+                groups_admin[admin.group_guid.group_guid]['creator'] = admin.admin_guid
+
+        return groups_admin
 
     @classmethod
     def get_group_admins(cls, group_guid):
@@ -225,3 +232,12 @@ class GroupSettings(BaseModel):
             text += f"{key}: {status} \n"
 
         return text
+
+
+class Messages(BaseModel):
+    m_type = CharField(max_length=10, )
+    group = ForeignKeyField(Group, )
+    user = ForeignKeyField(Users, )
+    text = TextField(null=True)
+    file_id = CharField(max_length=250, null=True)
+

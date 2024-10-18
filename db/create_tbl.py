@@ -1,7 +1,7 @@
-from db.models import database, SudoBot, Group, GroupAdmin, GroupSettings, Users
+from db.models import database, SudoBot, Group, GroupAdmin, GroupSettings, Users, Messages
 
 
 def create_table():
     with database:
         database.create_tables(models=(SudoBot, Group, GroupAdmin, GroupSettings, Users))
-        SudoBot.insert_sudo('g0FOWja03903574d3aa4d72e3e85ff83', True)
+        SudoBot.insert_sudo('u0FnZcm0ad0aba287aee1a53dc845d7c', True)
