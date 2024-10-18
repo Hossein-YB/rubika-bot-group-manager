@@ -153,11 +153,6 @@ class RubikaBot(Client):
         if not check:
             return False
 
-        if guid not in self.group_delete_messages:
-            self.group_delete_messages.append(guid)
-        else:
-            return False
-
         await msg.reply("شروع پاکسازی ...")
         while True:
             messages = await self.get_messages_interval(guid, msg.message_id)
@@ -172,10 +167,9 @@ class RubikaBot(Client):
 
     async def set_new_admin(self, msg: Updates):
         check = await self.check_sender(msg, True)
-
         if not check:
             return False
-        import pdb;pdb.set_trace()
+
         guid = msg.object_guid
         user = await self.get_messages_by_id(guid, msg.message.reply_to_message_id)
         user = user.messages[0].author_object_guid
@@ -256,45 +250,52 @@ class RubikaBot(Client):
     def run(self):
         self.add_handler(
             func=self.help_bot,
-            handler=handlers.MessageUpdates(filters.RegexModel('^راهنما$')))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^راهنما$'))))
 
         self.add_handler(
             func=self.add_new_group,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern=r'^setgroup$'), filters.is_group))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^setgroup$')),
+                                            filters.is_group))
 
         self.add_handler(
             func=self.update_group_admin,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بروزرسانی مدیران$'), filters.is_group))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^بروزرسانی مدیران$')),
+                                            filters.is_group))
 
         self.add_handler(
             func=self.get_lock_list,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^لیست قفل ها$'),
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^لیست قفل ها$')),
                                             filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.lock_group_setting,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^قفل '), filters.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^قفل ')),
+                                            filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.unlock_group_setting,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بازکردن '), filters.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^بازکردن ')),
+                                            filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.unlock_all,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بازکردن همه'), filters.is_group, filters.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^بازکردن همه$')),
+                                            filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.group_status,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^وضعیت'), filters.is_group, filters.object_guid in self.groups_id))
-
-        self.add_handler(
-            func=self.delete_all_messages,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^حذف تاریخچه'), filters.is_group, filters.object_guid in self.groups_id))
-
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^وضعیت$')),
+                                            filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.ban_user,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^بن'), filters.is_group, filters.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^بن$')),
+                                            filters.is_group, filters.object_guid in self.groups_id))
+
+        self.add_handler(
+            func=self.delete_all_messages,
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^حذف تاریخچه$')),
+                                            filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.set_new_admin,
@@ -303,10 +304,6 @@ class RubikaBot(Client):
         self.add_handler(
             func=self.delete_admin,
             handler=handlers.MessageUpdates(filters.RegexModel(pattern='^تنزل مقام'), filters.is_group, filters.object_guid in self.groups_id))
-
-        self.add_handler(
-            func=self.manage_group_setting,
-            handler=handlers.MessageUpdates(filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.manage_group_setting,
