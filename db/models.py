@@ -226,11 +226,9 @@ class GroupSettings(BaseModel):
         for key, val in cls.names.items():
             if getattr(group_setting, val):
                 status = "✅"
+                text += f"{key}: {status} \n"
             else:
                 status = "❌ "
-
-            text += f"{key}: {status} \n"
-
         return text
 
 

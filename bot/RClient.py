@@ -1,5 +1,7 @@
 from rubpy import Client, handlers, filters
+from rubpy.enums import ParseMode
 from rubpy.types import Updates
+
 
 from bot.utf8msg import Messages as MSG
 from db.models import SudoBot, Group, GroupAdmin, GroupSettings
@@ -129,18 +131,34 @@ class RubikaBot(Client):
 
         if not check:
             return False
-        status = "وضعیت قفل های گروه به این ترتیب است:\n" + GroupSettings.get_group_status(msg.object_guid)
-        return await msg.reply(status)
+        t1 = t2 = ''
+        status = self.text.group_status + GroupSettings.get_group_status(msg.object_guid)
+        admins = await self.get_group_admin_members(msg.object_guid)
+        for admin in admins.in_chat_members:
+            if admin.join_type.lower() == 'creator':
+                t1 += f"\n<a href='https://rubika.ir/{admin.username}'>{admin.first_name}</a>"
+            else:
+                t2 += f"\n<a href='https://rubika.ir/{admin.username}'>{admin.first_name}</a>"
+
+        status = status + self.text.group_creator + t1
+        status = status + self.text.group_admins + t2
+        return await self.send_message(msg.object_guid, status, reply_to_message_id=msg.message_id,
+                                       parse_mode=ParseMode.HTML)
 
     async def ban_user(self, msg: Updates):
         check = await self.check_sender(msg)
 
-        if not check:
+        if not check or not msg.message.reply_to_message_id:
             return False
 
         get_reply = await self.get_messages_by_id(msg.object_guid, msg.message.reply_to_message_id)
         get_reply = get_reply.messages[0] if len(get_reply.messages) > 0 else get_reply.messages
         user = await self.get_user_info(get_reply.author_object_guid)
+        if not user:
+            return await msg.reply(self.text.cant_find_user)
+
+        if user in self.admins_list[msg.object_guid]['admins']:
+            return await msg.reply(self.text.cant_ban_admin)
 
         await self.delete_messages(msg.object_guid, [get_reply.message_id])
         await self.ban_group_member(msg.object_guid, user.user.user_guid)
@@ -148,12 +166,20 @@ class RubikaBot(Client):
 
     async def delete_all_messages(self, msg: Updates):
         guid = msg.object_guid
+        text = msg.text.replace("حذف", '').strip()
+
+        if not text.isnumeric():
+            return False
+        text = int(text)
+        if text == 0 or not text:
+            return False
+
         check = await self.check_sender(msg)
 
         if not check:
             return False
-
-        await msg.reply("شروع پاکسازی ...")
+        num = 0
+        await msg.reply(self.text.start_delete)
         while True:
             messages = await self.get_messages_interval(guid, msg.message_id)
             if not messages.messages:
@@ -162,10 +188,13 @@ class RubikaBot(Client):
             for message in messages.messages:
                 ids.append(message.message_id)
             await self.delete_messages(guid, ids)
-
-        return await self.send_message(guid, "تمام پیام ها پاک شدند")
+            num += len(ids)
+            if num == text:
+                break
+        return await self.send_message(guid, self.text.delete_message.format(num))
 
     async def set_new_admin(self, msg: Updates):
+
         check = await self.check_sender(msg, True)
         if not check:
             return False
@@ -204,12 +233,6 @@ class RubikaBot(Client):
         group_setting = GroupSettings.get_or_none(GroupSettings.group_guid == g_guid)
         if not group_setting:
             return False
-
-        if group_setting.welcome and "از طریق لینک دعوت به گروه پیوست" in text:
-            user = await msg.get_author(g_user)
-            user_name = user.first_name
-            await msg.repla(f"کاربر {user_name} به گروه خوش آمدید")
-
         if (
                 (group_setting.chat and text and not msg.file_inline)
                 or group_setting.all_lock
@@ -232,6 +255,14 @@ class RubikaBot(Client):
             if setting:
                 return await msg.delete_messages()
 
+        if not text:
+            return True
+
+        if group_setting.welcome and text in self.text.join_messages:
+            user = await msg.get_author(g_user)
+            user_name = user.first_name
+            await msg.repla(f"کاربر {user_name} به گروه خوش آمدید")
+
         if text and (group_setting.link or group_setting.mention):
             links = re.findall(LINK_RE, text)
             mention = re.findall(MENTION, text)
@@ -241,10 +272,7 @@ class RubikaBot(Client):
                 await msg.delete_messages()
                 await self.ban_group_member(g_guid, g_user)
 
-        if (
-                (
-                        "را حذف کرد" in text or "گروه را ترک کرد" in text or "از طریق لینک دعوت به گروه پیوست" in text or "را اضافه کرد" in text)
-        ):
+        if text in self.text.rubika_messages:
             await msg.delete_messages()
 
     def run(self):
@@ -294,16 +322,18 @@ class RubikaBot(Client):
 
         self.add_handler(
             func=self.delete_all_messages,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^حذف تاریخچه$')),
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^حذف \d*$')),
                                             filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.set_new_admin,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^ارتقا مقام'), filters.is_group, filters.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^ارتقا مدیر$')),
+                                            filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.delete_admin,
-            handler=handlers.MessageUpdates(filters.RegexModel(pattern='^تنزل مقام'), filters.is_group, filters.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^عزل مدیر$')),
+                                            filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.manage_group_setting,
