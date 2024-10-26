@@ -79,8 +79,11 @@ class Users(BaseModel):
 
     @classmethod
     def insert_user(cls, user_guid, group_guid):
+        u = cls.get_or_none(cls.user_guid == user_guid, cls.group_guid == group_guid)
+        if u:
+            return u
         try:
-            cls.insert(user_guid=user_guid, group_guidn=group_guid)
+            return cls.create(user_guid=user_guid, group_guid=group_guid)
         except Exception as e:
             error_writer(e, 'insert_user')
             pass
@@ -233,9 +236,16 @@ class GroupSettings(BaseModel):
 
 
 class Messages(BaseModel):
+    group = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE", related_name='files')
+    user = ForeignKeyField(Users, Users.user_guid, on_delete="CASCADE", related_name='files')
+
     m_type = CharField(max_length=10, )
-    group = ForeignKeyField(Group, )
-    user = ForeignKeyField(Users, )
     text = TextField(null=True)
     file_id = CharField(max_length=250, null=True)
+
+    @classmethod
+    def insert_message(cls, m_type=None, group=None, user=None, text=None, file_id=None):
+        return cls.create(m_type=m_type, group=group, user=user, text=text, file_id=file_id)
+
+
 

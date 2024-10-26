@@ -1,5 +1,8 @@
+import asyncio
+
 from bot.RClient import RubikaBot
 from db.create_tbl import create_table
+
 
 if __name__ == '__main__':
     print("######------------------######")
@@ -8,6 +11,7 @@ if __name__ == '__main__':
     print("Database created and successfully connected...")
     print("######------------------######")
     client = RubikaBot(session='session', display_welcome=False)
-    client.run()
+    asyncio.run(client.run())
+
     
     

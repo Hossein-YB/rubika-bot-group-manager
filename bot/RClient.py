@@ -1,17 +1,20 @@
+import asyncio.exceptions
+import re
+
 from rubpy import Client, handlers, filters
 from rubpy.enums import ParseMode
 from rubpy.types import Updates
 
-
 from bot.utf8msg import Messages as MSG
-from db.models import SudoBot, Group, GroupAdmin, GroupSettings
-
+from bot.message_processor import MessageProcessor
 from bot.tools import LINK_RE, MENTION, error_writer
-import re
+
+from db.models import SudoBot, Group, GroupAdmin, GroupSettings, Users, Messages
 
 
 class RubikaBot(Client):
     def __init__(self, session: str, *args, **kwargs):
+        self.message_processor = MessageProcessor()
         self.text = MSG()
         self.sudo = SudoBot.get_main_su()  # guid sudo bot
         self.groups_id = Group.get_groups_list()  # bot groups
@@ -222,60 +225,9 @@ class RubikaBot(Client):
             f"کاربر از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(self.admins_list[msg.object_guid]['admins'])}")
 
     async def manage_group_setting(self, msg: Updates):
-        text = msg.message.text if msg.message.text else None
-        m_type = msg.message.type.lower()
+        await self.message_processor.message_manager(self, msg)
 
-        g_guid = msg.object_guid
-        g_user = msg.author_guid
-        if g_guid not in self.groups_id:
-            return False
-
-        group_setting = GroupSettings.get_or_none(GroupSettings.group_guid == g_guid)
-        if not group_setting:
-            return False
-        if (
-                (group_setting.chat and text and not msg.file_inline)
-                or group_setting.all_lock
-        ):
-            return await msg.delete_messages()
-
-        if (
-                (group_setting.rubinostory and m_type == "rubinostory") or
-                (group_setting.post and m_type == "rubinopost") or
-                (group_setting.forwarded_from and msg.forwarded_from or msg.forwarded_no_link)
-        ):
-            return await msg.delete_messages()
-
-        if msg.file_inline or msg.location or msg.sticker or msg.poll:
-            if msg.file_inline:
-                f_type = msg.file_inline.type.lower()
-            else:
-                f_type = msg.message.type.lower()
-            setting = getattr(group_setting, f_type)
-            if setting:
-                return await msg.delete_messages()
-
-        if not text:
-            return True
-
-        if group_setting.welcome and text in self.text.join_messages:
-            user = await msg.get_author(g_user)
-            user_name = user.first_name
-            await msg.repla(f"کاربر {user_name} به گروه خوش آمدید")
-
-        if text and (group_setting.link or group_setting.mention):
-            links = re.findall(LINK_RE, text)
-            mention = re.findall(MENTION, text)
-            if links or mention:
-                await msg.delete_messages()
-            if links:
-                await msg.delete_messages()
-                await self.ban_group_member(g_guid, g_user)
-
-        if text in self.text.rubika_messages:
-            await msg.delete_messages()
-
-    def run(self):
+    async def run(self):
         self.add_handler(
             func=self.help_bot,
             handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^راهنما$'))))
@@ -339,4 +291,10 @@ class RubikaBot(Client):
             func=self.manage_group_setting,
             handler=handlers.MessageUpdates(filters.object_guid in self.groups_id))
 
-        return super().run()
+        await self.start()
+        while True:
+            try:
+                await self.get_updates()
+            except asyncio.exceptions.TimeoutError as e:
+                pass
+

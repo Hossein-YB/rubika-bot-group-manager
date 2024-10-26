@@ -11,7 +11,7 @@ telegram-session*
 *.db
 *.rbs
 .env
-
+error_log
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
