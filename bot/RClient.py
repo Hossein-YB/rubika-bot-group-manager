@@ -209,13 +209,8 @@ class RubikaBot(Client):
         return await msg.reply(
             f"کاربر {user.title} از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(self.admins_list[msg.object_guid]['admins'])}")
 
-    @user_permissions_admin
-    async def manage_message_update(self, msg: Updates):
-        await self.message_processor.message_update(self, msg)
-
-    @user_permissions_admin
     async def manage_chat_update(self, msg: Updates):
-        await self.message_processor.chat_update(self, msg)
+        await self.message_processor.manage_group(self, msg)
 
     async def run(self, ):
         self.add_handler(
@@ -276,10 +271,6 @@ class RubikaBot(Client):
             func=self.delete_admin,
             handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^عزل مدیر$')),
                                             filters.is_group, filters.object_guid in self.groups_id))
-
-        self.add_handler(
-            func=self.manage_message_update,
-            handler=handlers.MessageUpdates(filters.object_guid in self.groups_id))
 
         self.add_handler(
             func=self.manage_chat_update,
