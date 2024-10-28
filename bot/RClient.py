@@ -24,7 +24,7 @@ class RubikaBot(Client):
             f" {self.admins_list}\n{'#---#' * 20}")
         super().__init__(session, *args, **kwargs)
 
-    async def check_sender(self, msg: Updates, is_main=False):
+    async def check_sender(self, msg: Updates, is_creator=False, is_admin=False):
         g_user = msg.author_guid
         group_admins = self.admins_list.get(msg.object_guid, None)
 
@@ -32,13 +32,17 @@ class RubikaBot(Client):
             return True
 
         if not group_admins:
-            return False
+            raise ValueError("admin list is Empty.")
 
-        if is_main and g_user == group_admins['creator']:
-            return 'creator'
+        if is_creator:
+            if g_user == group_admins['creator']:
+                return True
 
-        if not is_main and g_user in group_admins['admins']:
-            return True
+        if is_admin:
+            if g_user in group_admins['admins']:
+                return True
+
+        return False
 
     async def help_bot(self, msg: Updates):
         return await msg.reply(self.text.hellp)
@@ -290,6 +294,10 @@ class RubikaBot(Client):
         self.add_handler(
             func=self.manage_group_setting,
             handler=handlers.MessageUpdates(filters.object_guid in self.groups_id))
+
+        self.add_handler(
+            func=self.manage_group_setting,
+            handler=handlers.ChatUpdates(filters.object_guid in self.groups_id))
 
         await self.start()
         while True:
