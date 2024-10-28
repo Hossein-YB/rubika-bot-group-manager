@@ -46,7 +46,7 @@ class Messages:
     group_status = "قفل های فعال گروه:\n"
     group_creator = "\nسازنده گروه"
     group_admins = "\nمدیران گروه"
-
+    pleas_reply_on_message = "لطفا روی یک پیام ریپلاس کنید و بعد دستور را ارسال کنید"
     lock_list = "لیست قفل های ربات:"
     add_lock = "\n `قفل {}` \t `باز کردن {}`"
     lock = "قفل"
@@ -61,3 +61,5 @@ class Messages:
     rubika_messages = join_messages + left_messages
     start_delete = "شروع پاکسازی ..."
     delete_message = "تعداد {} پیام پاک شدند"
+    lock_not_found = "هیچ قفلی با این نام پیدا نشد"
+    open_all_locks = "همه قفل ها باز شدند"
