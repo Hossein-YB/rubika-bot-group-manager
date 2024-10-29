@@ -1,4 +1,5 @@
 import asyncio.exceptions
+import random
 import re
 
 from rubpy import Client, handlers, filters
@@ -209,6 +210,10 @@ class RubikaBot(Client):
         return await msg.reply(
             f"کاربر {user.title} از لیست ادمین های ربات در گروه حذف شد\nتعداد مدیران ربات در این گروه{len(self.admins_list[msg.object_guid]['admins'])}")
 
+    async def call_bot(self, msg: Updates):
+        text = random.choice(self.text.bot)
+        await msg.reply(text)
+
     async def manage_chat_update(self, msg: Updates):
         await self.message_processor.manage_group(self, msg)
 
@@ -270,6 +275,10 @@ class RubikaBot(Client):
         self.add_handler(
             func=self.delete_admin,
             handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^عزل مدیر$')),
+                                            filters.is_group, filters.object_guid in self.groups_id))
+        self.add_handler(
+            func=self.call_bot,
+            handler=handlers.MessageUpdates(filters.RegexModel(pattern=re.compile('^ربات$')),
                                             filters.is_group, filters.object_guid in self.groups_id))
 
         self.add_handler(
