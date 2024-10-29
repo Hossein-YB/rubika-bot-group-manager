@@ -48,7 +48,8 @@ class Messages:
     group_admins = "\nمدیران گروه"
     pleas_reply_on_message = "لطفا روی یک پیام ریپلاس کنید و بعد دستور را ارسال کنید"
     lock_list = "لیست قفل های ربات:"
-    add_lock = "\n `قفل {}` \t `باز کردن {}`"
+    copy = "با زدن رویهر یک خودکار کپی میشوند"
+    add_lock = "\n قفل {} \t باز کردن {}"
     lock = "قفل"
     active_lock = "قفل {} فعال شد."
     un_lock = "بازکردن"
@@ -56,10 +57,13 @@ class Messages:
     ban_user = "کاربر {} از گروه اخراج شد."
     cant_find_user = "کاربر یافت نشد"
     cant_ban_admin = "شما نمیتوانید ادمین های دیگر را اخراج کنید"
-    join_messages = ["را اضافه کرد", "از طریق لینک دعوت به گروه پیوست"]
-    left_messages = ["گروه را ترک کرد", "را حذف کرد"]
+    join_messages = ["را اضافه کرد", "از طریق لینک به گروه افزوده شد", '1 عضو جدید به گروه افزوده شد.']
+    left_messages = ["گروه را ترک کرد", "1 عضو از گروه حذف شد."]
     rubika_messages = join_messages + left_messages
     start_delete = "شروع پاکسازی ..."
     delete_message = "تعداد {} پیام پاک شدند"
     lock_not_found = "هیچ قفلی با این نام پیدا نشد"
     open_all_locks = "همه قفل ها باز شدند"
+    send_link = "ارسال لینک"
+    delete_user = "کاربر {} به علت ارسال {} از گروه حذف شد."
+    delete_message_t = 'کاربر {} ارسال {} در گروه ممنوع است'

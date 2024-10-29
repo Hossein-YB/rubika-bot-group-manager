@@ -87,8 +87,8 @@ class RubikaBot(Client):
         text = self.text.lock_list
         for i in GroupSettings.names.keys():
             text += self.text.add_lock.format(i, i)
-
-        await msg.reply(text)
+        text = text + "\n" + self.text.copy
+        await msg.reply(str(text))
 
     @user_permissions_admin
     async def lock_group_setting(self, msg: Updates):
@@ -274,7 +274,7 @@ class RubikaBot(Client):
 
         self.add_handler(
             func=self.manage_chat_update,
-            handler=handlers.ChatUpdates(filters.object_guid in self.groups_id))
+            handler=handlers.MessageUpdates(filters.is_group, filters.object_guid in self.groups_id))
 
         await self.start()
         while True:

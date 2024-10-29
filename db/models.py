@@ -1,6 +1,6 @@
 import datetime
 from peewee import MySQLDatabase, Model, CharField, ForeignKeyField, BooleanField, DateTimeField, IntegerField, \
-    TextField, CompositeKey
+    TextField, CompositeKey, BigIntegerField
 from playhouse.shortcuts import ReconnectMixin
 
 from bot.tools import error_writer
@@ -158,7 +158,7 @@ class GroupSettings(BaseModel):
         'ویس': "voice",
         'مکان': "location",
         'عکس': "image",
-        'پست': "post",
+        'پست': "rubinopost",
         'استوری': "rubinostory",
         'لینک': "link",
         'منشن': "mention",
@@ -168,13 +168,15 @@ class GroupSettings(BaseModel):
         'فروارد': "forwarded_from",
         'قفل گروه': "all_lock",
         'خوشامد': "welcome",
-        'جوین': "join"
+        'جوین': "join",
+        'نام کاربری کاربران': 'user_username',
     }
 
     group_guid = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE")
 
     link = BooleanField(default=True)
     mention = BooleanField(default=True)
+    user_username = BooleanField(default=False)
     welcome = BooleanField(default=True)
     join = BooleanField(default=True)
 
@@ -186,7 +188,7 @@ class GroupSettings(BaseModel):
     voice = BooleanField(default=False)
     location = BooleanField(default=False)
     image = BooleanField(default=False)
-    post = BooleanField(default=False)
+    rubinopost = BooleanField(default=False)
     sticker = BooleanField(default=False)
     poll = BooleanField(default=False)
     forwarded_from = BooleanField(default=False)
@@ -238,14 +240,14 @@ class GroupSettings(BaseModel):
 class Messages(BaseModel):
     group = ForeignKeyField(Group, Group.group_guid, on_delete="CASCADE", related_name='files')
     user = ForeignKeyField(Users, Users.user_guid, on_delete="CASCADE", related_name='files')
-
+    message_id = BigIntegerField()
     m_type = CharField(max_length=10, )
     text = TextField(null=True)
     file_id = CharField(max_length=250, null=True)
 
     @classmethod
-    def insert_message(cls, m_type=None, group=None, user=None, text=None, file_id=None):
-        return cls.create(m_type=m_type, group=group, user=user, text=text, file_id=file_id)
+    def insert_message(cls, message_id, m_type=None, group=None, user=None, text=None, file_id=None):
+        return cls.create(message_id=message_id, m_type=m_type, group=group, user=user, text=text, file_id=file_id)
 
 
 
